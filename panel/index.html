@@ -154,6 +154,11 @@ tr.sel td{background:color-mix(in srgb,var(--bordo) 8%,transparent)}
 .prov:hover{border-color:var(--bordo)}
 .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 12px;cursor:pointer;background:var(--surface)}
 .chip:has(input:checked){border-color:var(--bordo);background:color-mix(in srgb,var(--bordo) 10%,transparent)}
+.alert{background:var(--warn-bg);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.alert b{color:var(--warn)}
+.alert-list{display:flex;flex-wrap:wrap;gap:6px}
+.stock-in{width:84px;text-align:right}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-left:6px;vertical-align:middle}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:calc(100% - 32px)}
 .hist-day{font-family:var(--f-head);font-weight:600;padding:10px 12px;background:var(--cream)}
 @media (prefers-reduced-motion:no-preference){.toast{animation:pop .2s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
@@ -295,6 +300,28 @@ function itemCalc(it, getIng) {
 }
 function gastosMes() { return (S.cfg.gastos || []).reduce((a, g) => a + (parseNum(g.monto) || 0), 0); }
 function gastoLocalU() { const u = parseNum(S.cfg.unidadesMes); return u > 0 ? gastosMes() / u : 0; }
+const SHORT = { kg: "kg", g: "g", l: "l", ml: "ml", u: "u.", doc: "doc." };
+const hasStock = i => i && i.stock !== undefined && i.stock !== "" && isFinite(parseNum(i.stock));
+function stockState(i) {
+  if (!hasStock(i)) return null; const st = parseNum(i.stock), mn = parseNum(i.stockMinimo);
+  if (st <= 0) return "agotado"; if (mn > 0 && st <= mn) return "bajo"; return "ok";
+}
+const lowStock = () => Object.entries(S.ing).filter(([, i]) => ["agotado", "bajo"].includes(stockState(i))).sort(sortByName);
+function tandasPosibles(r) {
+  // Cuántas veces se puede hacer la receta con el stock actual (solo ingredientes con stock cargado)
+  let min = Infinity;
+  (r.items || []).forEach(it => { const ing = S.ing[it.ingId]; const q = parseNum(it.cantidad); const uu = UNITS[it.unidad], bu = UNITS[ing?.unidad];
+    if (!hasStock(ing) || !(q > 0) || !uu || !bu || uu.dim !== bu.dim) return;
+    min = Math.min(min, Math.floor((parseNum(ing.stock) * bu.f) / (q * uu.f) + 1e-9)); });
+  return min === Infinity ? null : Math.max(0, min);
+}
+function stockAlert() {
+  const low = lowStock(); if (!low.length) return "";
+  const porProv = {}; low.forEach(([, i]) => { const k = i.proveedor || "Sin proveedor"; (porProv[k] ||= []).push(i.nombre); });
+  return `<div class="alert" role="alert"><div class="row" style="gap:8px"><b>Te estás quedando sin stock de ${low.length} ingrediente${low.length > 1 ? "s" : ""}</b><span class="spacer"></span><button class="btn sm" data-act="ver-bajo">Ver stock bajo</button></div>
+    <div class="alert-list">${low.map(([, i]) => `<span class="pill ${stockState(i) === "agotado" ? "bad" : "warn"}">${esc(i.nombre)}: ${stockState(i) === "agotado" ? "agotado" : `quedan ${fmtNum(parseNum(i.stock))} ${SHORT[i.unidad] || ""}`}</span>`).join("")}</div>
+    <div class="sub">Pedir a: ${Object.entries(porProv).map(([p, l]) => `<b>${esc(p)}</b> (${esc(l.join(", "))})`).join(" · ")}</div></div>`;
+}
 function roundPrice(x) { const r = parseNum(S.cfg.redondeo) || 0; return r > 0 ? Math.ceil(x / r) * r : Math.round(x * 100) / 100; }
 function recCalc(r, overrides) {
   const getIng = id => (overrides && overrides[id]) || S.ing[id];
@@ -326,7 +353,7 @@ const sortByName = (a, b) => (a[1].nombre || "").localeCompare(b[1].nombre || ""
 const TABS = [["productos", "Productos"], ["ingredientes", "Ingredientes"], ["proveedores", "Proveedores"], ["importar", "Importar Word"], ["historial", "Historial"], ["ajustes", "Ajustes"]];
 function render() {
   const ni = Object.keys(S.ing).length, nr = Object.keys(S.rec).length;
-  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-act="tab" data-k="${k}" aria-selected="${ui.tab === k}">${l}${k === "productos" && nr ? `<span class="cnt">${nr}</span>` : ""}${k === "ingredientes" && ni ? `<span class="cnt">${ni}</span>` : ""}</button>`).join("");
+  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-act="tab" data-k="${k}" aria-selected="${ui.tab === k}">${l}${k === "productos" && nr ? `<span class="cnt">${nr}</span>` : ""}${k === "ingredientes" && ni ? `<span class="cnt">${ni}</span>` : ""}${k === "ingredientes" && lowStock().length ? `<span class="dot" title="Stock bajo"></span>` : ""}</button>`).join("");
   $("#store-chip").textContent = S.mode === "db" ? "Guardado en la nube" : S.mode === "local" ? "Guardado en este navegador" : S.mode === "readonly" ? "Solo lectura" : "Conectando…";
   const v = $("#view");
   if (S.mode === "init") { v.innerHTML = `<div class="panel empty"><p>Cargando tus recetas…</p></div>`; return; }
@@ -358,6 +385,7 @@ function viewProductos() {
   const priced = calcs.filter(c => c.precio > 0 && c.costoU > 0); const avgMargin = priced.length ? priced.reduce((a, c) => a + (c.precioSinIva - c.costoU) / c.precioSinIva * 100, 0) / priced.length : 0;
   return `
   <div class="row"><div><h2>Productos</h2><p class="lead">Cada receta calcula su costo con los precios actuales de los ingredientes. Si cambiás un precio, todo se recalcula al instante.</p></div></div>
+  ${stockAlert()}
   <div class="stats">
     <div class="stat"><div class="k">Productos</div><div class="v num">${recs.length}</div><div class="d">${okCount} al día${recs.length - okCount ? `, ${recs.length - okCount} para revisar` : ""}</div></div>
     <div class="stat"><div class="k">Ingredientes</div><div class="v num">${Object.keys(S.ing).length}</div><div class="d">${Object.values(S.ing).filter(i => !(parseNum(i.precio) > 0)).length} sin precio</div></div>
@@ -372,14 +400,14 @@ function viewProductos() {
     <button class="btn pri" data-act="new-rec">Nueva receta</button>
   </div>
   <div class="panel tbl-wrap"><table>
-    <thead><tr><th>Producto</th><th class="r">Rinde</th><th class="r">Costo receta</th><th class="r">Costo x u.</th><th class="r">Margen</th><th class="r">Precio final x u.</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Producto</th><th class="r">Rinde</th><th class="r">Costo receta</th><th class="r">Costo x u.</th><th class="r">Margen</th><th class="r">Precio final x u.</th><th class="r">Con el stock</th><th>Estado</th></tr></thead>
     <tbody id="rec-rows"></tbody></table></div>`;
 }
 function renderRecRows() {
   const tb = $("#rec-rows"); if (!tb) return;
   const q = norm(ui.qRec);
   const rows = Object.entries(S.rec).sort(sortByName).filter(([, r]) => (!q || norm(r.nombre + " " + (r.categoria || "")).includes(q)) && (!ui.catRec || r.categoria === ui.catRec));
-  if (!rows.length) { tb.innerHTML = `<tr><td colspan="7"><div class="empty"><p>${Object.keys(S.rec).length ? "No hay productos que coincidan con la búsqueda." : "Todavía no hay recetas. Creá la primera o importala desde Word."}</p>${Object.keys(S.rec).length ? "" : `<button class="btn pri" data-act="new-rec">Nueva receta</button>`}</div></td></tr>`; return; }
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty"><p>${Object.keys(S.rec).length ? "No hay productos que coincidan con la búsqueda." : "Todavía no hay recetas. Creá la primera o importala desde Word."}</p>${Object.keys(S.rec).length ? "" : `<button class="btn pri" data-act="new-rec">Nueva receta</button>`}</div></td></tr>`; return; }
   tb.innerHTML = rows.map(([id, r]) => { const c = recCalc(r); return `
     <tr class="clickable" data-act="edit-rec" data-id="${id}">
       <td><div class="name">${esc(r.nombre)}</div><div class="sub">${esc(r.categoria || "Sin categoría")} · ${(r.items || []).length} ingredientes</div></td>
@@ -388,6 +416,7 @@ function renderRecRows() {
       <td class="r num">${fmtMoney(c.costoU)}${c.gastoU ? `<div class="sub">incl. ${fmtMoney(c.gastoU)} del local</div>` : ""}</td>
       <td class="r num">${fmtNum(c.margen, 0)}%</td>
       <td class="r num"><b>${fmtMoney(c.precio)}</b>${c.iva ? `<div class="sub">${fmtMoney(c.precioSinIva)} + IVA</div>` : ""}</td>
+      <td class="r num">${(t => t === null ? `<span class="sub">—</span>` : t === 0 ? `<span class="pill bad">No alcanza</span>` : `${t} tanda${t > 1 ? "s" : ""}`)(tandasPosibles(r))}</td>
       <td>${statusPill(c)}</td></tr>`; }).join("");
 }
 
@@ -398,11 +427,13 @@ function viewIngredientes() {
   const cats = [...new Set(all.map(([, i]) => i.categoria).filter(Boolean))].sort();
   const provs = [...new Set(all.map(([, i]) => i.proveedor).filter(Boolean))].sort();
   return `
+  ${stockAlert()}
   <div><h2>Ingredientes</h2><p class="lead">Cambiá un precio directamente en la tabla, o marcá varios ingredientes para aumentarlos juntos. Antes de aplicar ves cómo quedan los productos.</p></div>
   <div class="row">
     <input class="in search" id="q-ing" data-live="1" placeholder="Buscar ingrediente o proveedor…" value="${esc(ui.qIng)}" aria-label="Buscar ingrediente">
     <select class="in" id="cat-ing" aria-label="Filtrar"><option value="">Todos</option>
       <option value="__sin" ${ui.catIng === "__sin" ? "selected" : ""}>Sin precio</option>
+      <option value="__bajo" ${ui.catIng === "__bajo" ? "selected" : ""}>Stock bajo o agotado</option>
       ${cats.length ? `<optgroup label="Categoría">${cats.map(c => `<option value="c:${esc(c)}" ${"c:" + c === ui.catIng ? "selected" : ""}>${esc(c)}</option>`).join("")}</optgroup>` : ""}
       ${provs.length ? `<optgroup label="Proveedor">${provs.map(c => `<option value="p:${esc(c)}" ${"p:" + c === ui.catIng ? "selected" : ""}>${esc(c)}</option>`).join("")}</optgroup>` : ""}
     </select>
@@ -410,7 +441,7 @@ function viewIngredientes() {
     <button class="btn pri" data-act="new-ing">Agregar ingrediente</button>
   </div>
   <div class="panel tbl-wrap"><table>
-    <thead><tr><th style="width:36px"><input type="checkbox" id="sel-all" aria-label="Seleccionar todos los visibles"></th><th>Ingrediente</th><th>Presentación</th><th class="r">Precio de compra</th><th class="r">Costo</th><th class="r">Usado en</th><th></th></tr></thead>
+    <thead><tr><th style="width:36px"><input type="checkbox" id="sel-all" aria-label="Seleccionar todos los visibles"></th><th>Ingrediente</th><th>Presentación</th><th class="r">Precio de compra</th><th class="r">Costo</th><th class="r">Stock</th><th class="r">Usado en</th><th></th></tr></thead>
     <tbody id="ing-rows"></tbody></table></div>
   <div id="bulk-slot"></div>`;
 }
@@ -418,7 +449,7 @@ function visibleIngs() {
   const q = norm(ui.qIng), f = ui.catIng;
   return Object.entries(S.ing).sort(sortByName).filter(([, i]) =>
     (!q || norm(i.nombre + " " + (i.proveedor || "") + " " + (i.categoria || "")).includes(q)) &&
-    (!f || (f === "__sin" ? !(parseNum(i.precio) > 0) : f.startsWith("c:") ? i.categoria === f.slice(2) : i.proveedor === f.slice(2))));
+    (!f || (f === "__sin" ? !(parseNum(i.precio) > 0) : f === "__bajo" ? ["bajo", "agotado"].includes(stockState(i)) : f.startsWith("c:") ? i.categoria === f.slice(2) : i.proveedor === f.slice(2))));
 }
 function renderIngRows() {
   const tb = $("#ing-rows"); if (!tb) return;
@@ -431,9 +462,10 @@ function renderIngRows() {
       <td class="num">${fmtNum(parseNum(i.cantidad))} ${esc(plural(UNITS[i.unidad]?.label || i.unidad, parseNum(i.cantidad)))}</td>
       <td class="r"><span class="money"><i>${esc(S.cfg.moneda || "$")}</i><input class="in price-in num" data-live="1" data-act="price" data-id="${id}" inputmode="decimal" value="${sinP ? "" : esc(fmtNum(parseNum(i.precio)))}" placeholder="Sin precio" aria-label="Precio de ${esc(i.nombre)}"></span></td>
       <td class="r num">${sinP ? `<span class="pill warn">Falta precio</span>` : `${fmtMoney(per)} <span class="sub">${costLabel(i)}</span>`}</td>
+      <td class="r"><div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:nowrap"><input class="in stock-in num" data-live="1" data-act="stock" data-id="${id}" inputmode="decimal" value="${hasStock(i) ? esc(fmtNum(parseNum(i.stock), 3)) : ""}" placeholder="—" aria-label="Stock de ${esc(i.nombre)}"><span class="sub">${SHORT[i.unidad] || ""}</span></div>${stockState(i) === "agotado" ? `<span class="pill bad">Agotado</span>` : stockState(i) === "bajo" ? `<span class="pill warn">Stock bajo</span>` : parseNum(i.stockMinimo) > 0 ? `<span class="sub">mín. ${fmtNum(parseNum(i.stockMinimo))}</span>` : ""}</td>
       <td class="r num">${usage[id] ? `${usage[id]} producto${usage[id] > 1 ? "s" : ""}` : `<span class="sub">—</span>`}</td>
       <td class="r"><button class="btn sm ghost" data-act="edit-ing" data-id="${id}">Editar</button></td></tr>`; }).join("")
-    : `<tr><td colspan="7"><div class="empty"><p>No hay ingredientes que coincidan.</p></div></td></tr>`;
+    : `<tr><td colspan="8"><div class="empty"><p>No hay ingredientes que coincidan.</p></div></td></tr>`;
   const sa = $("#sel-all"); if (sa) { const vis = rows.map(r => r[0]); sa.checked = vis.length > 0 && vis.every(id => ui.sel.has(id)); sa.indeterminate = !sa.checked && vis.some(id => ui.sel.has(id)); }
   renderBulk();
 }
@@ -505,15 +537,19 @@ function openIng(id) {
       <label class="f">Precio del paquete<span class="money"><i>${esc(S.cfg.moneda || "$")}</i><input class="in num" id="i-precio" inputmode="decimal" value="${parseNum(i.precio) > 0 ? esc(fmtNum(parseNum(i.precio))) : ""}" placeholder="0"></span></label>
       <label class="f">Proveedor<input class="in" id="i-prov" list="dl-prov" value="${esc(i.proveedor || "")}" placeholder="opcional"></label>
     </div>
+    <div class="grid">
+      <label class="f">Stock actual (<span id="i-su">${SHORT[i.unidad] || ""}</span>)<input class="in num" id="i-stock" inputmode="decimal" value="${hasStock(i) ? esc(fmtNum(parseNum(i.stock), 3)) : ""}" placeholder="opcional"></label>
+      <label class="f">Avisarme cuando quede menos de<input class="in num" id="i-min" inputmode="decimal" value="${parseNum(i.stockMinimo) > 0 ? esc(fmtNum(parseNum(i.stockMinimo), 3)) : ""}" placeholder="ej. 2"></label>
+    </div>
     <div class="calc" id="i-calc"></div>
     ${used.length ? `<p class="note">Se usa en: ${used.map(([, r]) => esc(r.nombre)).join(", ")}.</p>` : ""}
   </div>
   <div class="md-f">${id ? `<span id="del-zone"><button type="button" class="btn danger" data-act="ask-del-ing">Borrar</button></span>` : ""}<span class="spacer"></span><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`);
   updIngCalc(); $("#i-nombre").focus();
 }
-function readIng() { return { nombre: $("#i-nombre").value.trim(), categoria: $("#i-cat").value.trim(), proveedor: $("#i-prov").value.trim(), cantidad: parseNum($("#i-cant").value), unidad: $("#i-unid").value, precio: parseNum($("#i-precio").value) || 0 }; }
+function readIng() { return { nombre: $("#i-nombre").value.trim(), categoria: $("#i-cat").value.trim(), proveedor: $("#i-prov").value.trim(), cantidad: parseNum($("#i-cant").value), unidad: $("#i-unid").value, precio: parseNum($("#i-precio").value) || 0, stock: $("#i-stock").value.trim() === "" ? "" : Math.max(0, parseNum($("#i-stock").value) || 0), stockMinimo: parseNum($("#i-min").value) || "" }; }
 function updIngCalc() {
-  const el = $("#i-calc"); if (!el) return; const i = readIng(); const uc = unitCost(i);
+  const el = $("#i-calc"); if (!el) return; const i = readIng(); const uc = unitCost(i); const su = $("#i-su"); if (su) su.textContent = SHORT[i.unidad] || "";
   const dimU = UNITS[i.unidad].dim === "u";
   el.innerHTML = `<div><div class="k">Costo ${costLabel(i)}</div><div class="v num">${isFinite(uc) && i.precio > 0 ? fmtMoney(dimU ? uc : uc * 1000) : "—"}</div></div>
     <div><div class="k">${dimU ? "Costo por unidad" : "Costo por 100 g"}</div><div class="v num">${isFinite(uc) && i.precio > 0 ? fmtMoney(dimU ? uc : uc * 100) : "—"}</div></div>`;
@@ -544,7 +580,7 @@ function openRec(id, preset) {
     <div class="calc" id="r-calc"></div>
     <label class="f">Preparación y notas<textarea class="in" id="r-notas" rows="4">${esc(r.notas || "")}</textarea></label>
   </div>
-  <div class="md-f">${id ? `<span id="del-zone"><button type="button" class="btn danger" data-act="ask-del-rec">Borrar</button></span><button type="button" class="btn" data-act="dup-rec">Duplicar</button>` : ""}<span class="spacer"></span><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn pri" type="submit">Guardar receta</button></div></form>`);
+  <div class="md-f">${id ? `<span id="del-zone"><button type="button" class="btn danger" data-act="ask-del-rec">Borrar</button></span><button type="button" class="btn" data-act="dup-rec">Duplicar</button><span class="row" style="gap:6px"><input class="in num" id="r-tandas" inputmode="decimal" value="1" style="width:60px" aria-label="Tandas"><button type="button" class="btn" data-act="producir" title="Descuenta los ingredientes del stock">Registrar tanda hecha</button></span>` : ""}<span class="spacer"></span><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn pri" type="submit">Guardar receta</button></div></form>`);
   renderItems(); renderExtras(); updRecCalc();
   if (!id) $("#r-nombre").focus();
 }
@@ -868,6 +904,7 @@ function setTab(k) { ui.tab = k; try { localStorage.setItem("chialli-tab", k); }
 /* ====================== Ejemplos ====================== */
 const SEED_I = [["Harina de arroz", "Harinas", 1, "kg", 2400], ["Fécula de mandioca", "Harinas", 1, "kg", 2100], ["Almidón de maíz", "Harinas", 1, "kg", 1900], ["Azúcar", "Secos", 1, "kg", 1300], ["Polvo de hornear sin TACC", "Secos", 50, "g", 650], ["Goma xántica", "Secos", 100, "g", 3500], ["Manteca", "Frescos", 200, "g", 2600], ["Huevos", "Frescos", 30, "u", 7500], ["Leche", "Frescos", 1, "l", 1400], ["Dulce de leche repostero", "Rellenos", 1, "kg", 5200], ["Coco rallado", "Rellenos", 500, "g", 3800], ["Esencia de vainilla", "Secos", 100, "ml", 1500], ["Bolsas celofán", "Packaging", 100, "u", 4000], ["Premezcla sin TACC", "Harinas", 1, "kg", 3200], ["Levadura seca", "Secos", 500, "g", 6500], ["Aceite de girasol", "Secos", 1.5, "l", 3300], ["Sal fina", "Secos", 500, "g", 900], ["Chocolate semiamargo", "Rellenos", 1, "kg", 14000], ["Cacao amargo", "Secos", 360, "g", 4500], ["Limones", "Frescos", 6, "u", 1500], ["Queso pategrás", "Frescos", 1, "kg", 12000], ["Puré de tomate", "Secos", 520, "g", 1100], ["Cajas de cartón", "Packaging", 10, "u", 6000]];
 const SEED_P = [["Distribuidora Celíaca", ["Harinas", "Secos"], "Pedidos por WhatsApp, entrega los martes"], ["Lácteos La Sierra", ["Frescos"], "Reparto diario a la mañana"], ["Dulces del Sur", ["Rellenos"], "Pedido mínimo 5 kg"], ["Envases Ventana", ["Packaging"], ""]];
+const SEED_STOCK = { "Huevos": [12, 30], "Manteca": [300, 400], "Dulce de leche repostero": [0, 1], "Harina de arroz": [5, 2], "Premezcla sin TACC": [1.5, 2] };
 const SEED_R = [["Alfajores de maicena", "Alfajores", 24, "unidades", 120, [["Almidón de maíz", 300, "g"], ["Harina de arroz", 200, "g"], ["Manteca", 200, "g"], ["Azúcar", 150, "g"], ["Huevos", 3, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Esencia de vainilla", 5, "ml"], ["Dulce de leche repostero", 500, "g"], ["Coco rallado", 50, "g"], ["Bolsas celofán", 24, "u"]], []], ["Budín de vainilla", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Leche", 120, "ml"], ["Manteca", 100, "g"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"], ["Esencia de vainilla", 5, "ml"]], [["Molde descartable y etiqueta", 450]]], ["Budín de limón", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Aceite de girasol", 100, "ml"], ["Limones", 2, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"]], [["Molde descartable y etiqueta", 450]]], ["Alfajores de chocolate", "Alfajores", 18, "unidades", 120, [["Harina de arroz", 150, "g"], ["Almidón de maíz", 150, "g"], ["Cacao amargo", 40, "g"], ["Manteca", 150, "g"], ["Azúcar", 120, "g"], ["Huevos", 2, "u"], ["Polvo de hornear sin TACC", 8, "g"], ["Dulce de leche repostero", 400, "g"], ["Chocolate semiamargo", 400, "g"], ["Bolsas celofán", 18, "u"]], []], ["Pan de molde", "Panes", 1, "pan", 100, [["Premezcla sin TACC", 500, "g"], ["Levadura seca", 10, "g"], ["Aceite de girasol", 50, "ml"], ["Sal fina", 10, "g"], ["Azúcar", 15, "g"], ["Huevos", 2, "u"], ["Bolsas celofán", 1, "u"]], []], ["Chipá", "Panes", 30, "unidades", 110, [["Fécula de mandioca", 500, "g"], ["Queso pategrás", 300, "g"], ["Manteca", 100, "g"], ["Huevos", 2, "u"], ["Leche", 100, "ml"], ["Sal fina", 5, "g"], ["Bolsas celofán", 3, "u"]], []], ["Prepizza", "Panes", 4, "unidades", 100, [["Premezcla sin TACC", 400, "g"], ["Levadura seca", 8, "g"], ["Aceite de girasol", 30, "ml"], ["Sal fina", 8, "g"], ["Puré de tomate", 260, "g"], ["Bolsas celofán", 4, "u"]], []], ["Brownie", "Postres", 12, "porciones", 120, [["Chocolate semiamargo", 200, "g"], ["Manteca", 150, "g"], ["Azúcar", 200, "g"], ["Huevos", 4, "u"], ["Harina de arroz", 60, "g"], ["Cacao amargo", 30, "g"], ["Esencia de vainilla", 5, "ml"], ["Cajas de cartón", 1, "u"]], []]];
 async function seed(silent) {
   const now = new Date().toISOString();
@@ -876,7 +913,7 @@ async function seed(silent) {
   const provDe = cat => (SEED_P.find(p => p[1].includes(cat)) || [""])[0];
   const haveP = new Set(Object.values(S.prov).map(p => norm(p.nombre)));
   for (const [nombre, rubros, notas] of SEED_P) if (!haveP.has(norm(nombre))) await put("proveedores", uid(), { nombre, rubros, contacto: "", telefono: "", email: "", notas, ejemplo: true });
-  for (const [nombre, categoria, cantidad, unidad, precio] of SEED_I) { if (ids[nombre]) continue; const id = uid(); ids[nombre] = id; await put("ingredientes", id, { nombre, categoria, proveedor: provDe(categoria), cantidad, unidad, precio, ejemplo: true, creado: now }); }
+  for (const [nombre, categoria, cantidad, unidad, precio] of SEED_I) { if (ids[nombre]) continue; const id = uid(); ids[nombre] = id; const [stock, stockMinimo] = SEED_STOCK[nombre] || [cantidad * 3, cantidad]; await put("ingredientes", id, { nombre, categoria, proveedor: provDe(categoria), cantidad, unidad, precio, stock, stockMinimo, ejemplo: true, creado: now }); }
   const have = new Set(Object.values(S.rec).filter(r => r.ejemplo).map(r => r.nombre));
   for (const [nombre, categoria, rinde, unidadRinde, margen, items, extras] of SEED_R) {
     if (have.has(nombre)) continue;
@@ -899,6 +936,19 @@ document.addEventListener("click", async e => {
     case "new-ing": openIng(null); break;
     case "edit-ing": openIng(id); break;
     case "new-prov": openProv(null, t.dataset.rubro); break;
+    case "ver-bajo": ui.catIng = "__bajo"; ui.sel.clear(); setTab("ingredientes"); break;
+    case "producir": {
+      const r = S.rec[recDraft.id]; const n = parseNum($("#r-tandas").value) || 0; if (!(n > 0)) { $("#r-tandas").focus(); break; }
+      t.disabled = true; const sinStock = []; const cambios = {};
+      (r.items || []).forEach(it => { const ing = S.ing[it.ingId]; const uu = UNITS[it.unidad], bu = UNITS[ing?.unidad];
+        if (!ing || !uu || !bu || uu.dim !== bu.dim || !(parseNum(it.cantidad) > 0)) return;
+        if (!hasStock(cambios[it.ingId] || ing)) { sinStock.push(ing.nombre); return; }
+        const cur = cambios[it.ingId] || { ...ing }; cur.stock = Math.max(0, Math.round((parseNum(cur.stock) - parseNum(it.cantidad) * uu.f * n / bu.f) * 1000) / 1000); cambios[it.ingId] = cur; });
+      await Promise.all(Object.entries(cambios).map(([id, ing]) => put("ingredientes", id, ing)));
+      closeModal();
+      const low = Object.keys(cambios).filter(id => ["bajo", "agotado"].includes(stockState(S.ing[id])));
+      toast(`Descontado del stock: ${n} tanda${n > 1 ? "s" : ""} de ${r.nombre}.${low.length ? ` Atención: ${low.map(id => S.ing[id].nombre).join(", ")} ${low.length > 1 ? "quedaron" : "quedó"} con stock bajo.` : ""}${sinStock.length ? ` (${sinStock.length} ingrediente${sinStock.length > 1 ? "s" : ""} sin stock cargado)` : ""}`);
+      break; }
     case "edit-prov": openProv(id); break;
     case "add-rubro": { const v = $("#p-nuevo").value.trim(); if (!v) { $("#p-nuevo").focus(); break; } $("#p-rubros").insertAdjacentHTML("beforeend", `<label class="chip"><input type="checkbox" value="${esc(v)}" checked> ${esc(v)}</label>`); $("#p-nuevo").value = ""; break; }
     case "ask-del-prov": $("#del-zone").innerHTML = `<span class="note">¿Borrar? </span><button type="button" class="btn danger" data-act="del-prov">Sí, borrar</button>`; break;
@@ -963,6 +1013,11 @@ document.addEventListener("change", e => {
   else if (t.dataset.item != null && t.tagName === "SELECT") { const it = recDraft.items[+t.dataset.item]; it[t.dataset.f] = t.value; if (t.dataset.f === "ingId" && S.ing[t.value]) { const dim = UNITS[S.ing[t.value].unidad].dim; if (UNITS[it.unidad].dim !== dim) it.unidad = dim === "u" ? "u" : "g"; } readRecHead(); renderItems(); updRecCalc(); }
   else if (t.dataset.draft != null && t.dataset.f === "incluir") { ui.drafts[+t.dataset.draft].incluir = t.checked; render(); }
   else if (t.dataset.di) { const [k, j] = t.dataset.di.split(":").map(Number); const it = ui.drafts[k].items[j]; if (t.dataset.f === "unidad") it.unidad = t.value; if (t.dataset.f === "match") { it.match = t.value; render(); } }
+  else if (t.dataset.act === "stock") {
+    const id = t.dataset.id, i = S.ing[id]; const raw = t.value.trim();
+    const v = raw === "" ? "" : Math.max(0, parseNum(raw)); if (raw !== "" && !isFinite(v)) { t.value = hasStock(i) ? fmtNum(parseNum(i.stock), 3) : ""; return; }
+    put("ingredientes", id, { ...i, stock: v }).then(() => { render(); const st = stockState(S.ing[id]); if (st === "bajo" || st === "agotado") toast(`${i.nombre}: ${st === "agotado" ? "agotado" : "stock bajo"}. ${i.proveedor ? `Pedile a ${i.proveedor}.` : ""}`); });
+  }
   else if (t.dataset.act === "price") {
     const id = t.dataset.id, i = S.ing[id]; const v = parseNum(t.value); const o = parseNum(i.precio) || 0;
     if (t.value.trim() === "" || !isFinite(v) || v < 0 || v === o) { t.value = o > 0 ? fmtNum(o) : ""; return; }
@@ -973,7 +1028,7 @@ document.addEventListener("change", e => {
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("#modal").innerHTML) closeModal();
-  if (e.key === "Enter" && e.target.dataset?.act === "price") e.target.blur();
+  if (e.key === "Enter" && (e.target.dataset?.act === "price" || e.target.dataset?.act === "stock")) e.target.blur();
   if (e.key === "Enter" && e.target.id === "bulk-val") { e.preventDefault(); $('[data-act="bulk-preview"]')?.click(); }
 });
 document.addEventListener("submit", async e => {
