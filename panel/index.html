@@ -159,6 +159,11 @@ tr.sel td{background:color-mix(in srgb,var(--bordo) 8%,transparent)}
 .alert-list{display:flex;flex-wrap:wrap;gap:6px}
 .stock-in{width:84px;text-align:right}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-left:6px;vertical-align:middle}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:620px){.choice{grid-template-columns:1fr}}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;background:var(--surface)}
+.opt.on{border-color:var(--bordo);background:color-mix(in srgb,var(--bordo) 7%,var(--surface))}
+.opt input{margin-top:4px;accent-color:var(--bordo)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:calc(100% - 32px)}
 .hist-day{font-family:var(--f-head);font-weight:600;padding:10px 12px;background:var(--cream)}
 @media (prefers-reduced-motion:no-preference){.toast{animation:pop .2s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
@@ -337,10 +342,13 @@ function recCalc(r, overrides) {
   const margen = parseNum(r.margen); const m = isFinite(margen) ? margen : parseNum(S.cfg.margen) || 0;
   const iva = Math.max(0, parseNum(S.cfg.iva) || 0);
   // El redondeo se aplica al precio final (el que ve el cliente); el precio sin IVA se deriva de él.
-  const precio = total > 0 ? roundPrice(costoU * (1 + m / 100) * (1 + iva / 100)) : 0;
+  const sugerido = total > 0 ? roundPrice(costoU * (1 + m / 100) * (1 + iva / 100)) : 0;
+  const fijo = parseNum(r.precioFijo) > 0;
+  const precio = fijo ? parseNum(r.precioFijo) : sugerido;
   const precioSinIva = precio / (1 + iva / 100);
+  const margenReal = costoU > 0 ? (precioSinIva / costoU - 1) * 100 : 0;
   if (!(r.items || []).length) issues.push({ lvl: "warn", t: "Sin ingredientes" });
-  return { ingCost, extras, total, rinde, costoReceta, gastoU, costoU, margen: m, iva, precio, precioSinIva, ivaMonto: precio - precioSinIva, ganancia: precioSinIva - costoU, issues };
+  return { ingCost, extras, total, rinde, costoReceta, gastoU, costoU, margen: m, iva, precio, sugerido, fijo, margenReal, precioSinIva, ivaMonto: precio - precioSinIva, ganancia: precioSinIva - costoU, issues };
 }
 function statusPill(c) {
   if (c.issues.some(i => i.lvl === "bad")) return `<span class="pill bad" title="${esc(c.issues.map(i => i.t).join(" · "))}">Revisar unidades</span>`;
@@ -415,8 +423,8 @@ function renderRecRows() {
       <td class="r num">${fmtNum(c.rinde)} <span class="sub">${esc(r.unidadRinde || "u.")}</span></td>
       <td class="r num">${fmtMoney(c.total)}</td>
       <td class="r num">${fmtMoney(c.costoU)}${c.gastoU ? `<div class="sub">incl. ${fmtMoney(c.gastoU)} del local</div>` : ""}</td>
-      <td class="r num">${fmtNum(c.margen, 0)}%</td>
-      <td class="r num"><b>${fmtMoney(c.precio)}</b>${c.iva ? `<div class="sub">${fmtMoney(c.precioSinIva)} + IVA</div>` : ""}</td>
+      <td class="r num">${c.fijo ? `<span class="${c.margenReal < c.margen ? "up" : ""}" title="Margen real con el precio fijo">${fmtNum(c.margenReal, 0)}%</span>` : `${fmtNum(c.margen, 0)}%`}</td>
+      <td class="r num"><b>${fmtMoney(c.precio)}</b>${c.fijo ? `<div><span class="pill neu" title="Precio mantenido a mano. Sugerido: ${esc(fmtMoney(c.sugerido))}">fijo · sugerido ${fmtMoney(c.sugerido)}</span></div>` : c.iva ? `<div class="sub">${fmtMoney(c.precioSinIva)} + IVA</div>` : ""}</td>
       <td class="r num">${(t => t === null ? `<span class="sub">—</span>` : t === 0 ? `<span class="pill bad">No alcanza</span>` : `${t} tanda${t > 1 ? "s" : ""}`)(tandasPosibles(r))}</td>
       <td>${statusPill(c)}</td></tr>`; }).join("");
 }
@@ -495,18 +503,24 @@ function openPreview(newPrices, title) {
   const ids = new Set(Object.keys(newPrices));
   const overrides = {}; ids.forEach(id => overrides[id] = { ...S.ing[id], precio: newPrices[id] });
   const affected = recipesUsing(ids).sort(sortByName).map(([id, r]) => { const a = recCalc(r), b = recCalc(r, overrides); return { id, r, a, b }; });
-  ui.preview = { newPrices, title };
+  const mode = ui.preview?.newPrices === newPrices ? ui.preview.mode : "auto";
+  ui.preview = { newPrices, title, mode };
+  const keep = mode === "mantener";
   modal(`<div class="md-h"><h3>${esc(title)}</h3><span class="spacer"></span><button class="btn ghost" data-act="close">Cerrar</button></div>
   <div class="md-b">
     <div class="tbl-wrap"><table style="min-width:420px"><thead><tr><th>Ingrediente</th><th class="r">Precio actual</th><th class="r">Precio nuevo</th><th class="r">Cambio</th></tr></thead><tbody>
       ${[...ids].map(id => { const o = parseNum(S.ing[id].precio) || 0, n = newPrices[id]; const p = o ? (n - o) / o * 100 : 0; return `<tr><td class="name">${esc(S.ing[id].nombre)}</td><td class="r num">${fmtMoney(o)}</td><td class="r num"><b>${fmtMoney(n)}</b></td><td class="r num ${p > 0 ? "up" : p < 0 ? "down" : ""}">${o ? fmtPct(p) : "nuevo"}</td></tr>`; }).join("")}
     </tbody></table></div>
-    <h3>Productos que cambian de precio (${affected.length})</h3>
+    ${affected.length ? `<div class="choice" role="radiogroup" aria-label="Qué hacer con los precios de venta">
+      <label class="opt ${!keep ? "on" : ""}"><input type="radio" name="pmode" value="auto" ${!keep ? "checked" : ""}><span><b>Actualizar precios de venta</b><br><span class="sub">Los productos suben según el nuevo costo y tu margen.</span></span></label>
+      <label class="opt ${keep ? "on" : ""}"><input type="radio" name="pmode" value="mantener" ${keep ? "checked" : ""}><span><b>Mantener los precios de venta</b><br><span class="sub">Solo cambia el costo. Ganás menos por unidad hasta que decidas subirlos.</span></span></label>
+    </div>` : ""}
+    <h3>${keep ? "Cómo queda tu ganancia" : "Productos que cambian de precio"} (${affected.length})</h3>
     ${affected.length ? `<div class="tbl-wrap"><table style="min-width:520px"><thead><tr><th>Producto</th><th class="r">Costo x u.</th><th class="r">Precio actual</th><th class="r">Precio nuevo</th><th class="r">Cambio</th></tr></thead><tbody>
-      ${affected.map(x => { const p = x.a.precio ? (x.b.precio - x.a.precio) / x.a.precio * 100 : 0; return `<tr><td class="name">${esc(x.r.nombre)}</td><td class="r num">${fmtMoney(x.a.costoU)} → ${fmtMoney(x.b.costoU)}</td><td class="r num">${fmtMoney(x.a.precio)}</td><td class="r num"><b>${fmtMoney(x.b.precio)}</b></td><td class="r num ${p > 0 ? "up" : p < 0 ? "down" : ""}">${fmtPct(p)}</td></tr>`; }).join("")}
+      ${affected.map(x => { const nuevo = keep ? x.a.precio : x.b.sugerido; const p = x.a.precio ? (nuevo - x.a.precio) / x.a.precio * 100 : 0; return `<tr><td class="name">${esc(x.r.nombre)}${x.r.precioFijo && !keep ? ` <span class="pill neu">deja de ser fijo</span>` : ""}</td><td class="r num">${fmtMoney(x.a.costoU)} → ${fmtMoney(x.b.costoU)}</td><td class="r num">${fmtMoney(x.a.precio)}</td><td class="r num"><b>${fmtMoney(keep ? x.a.precio : x.b.sugerido)}</b>${keep ? `<div class="sub">ganás ${fmtMoney(x.a.precio / (1 + x.a.iva / 100) - x.b.costoU)} (antes ${fmtMoney(x.a.precio / (1 + x.a.iva / 100) - x.a.costoU)})</div>` : ""}</td><td class="r num ${p > 0 ? "up" : p < 0 ? "down" : ""}">${fmtPct(p)}</td></tr>`; }).join("")}
     </tbody></table></div>` : `<p class="note">Ningún producto usa estos ingredientes todavía.</p>`}
   </div>
-  <div class="md-f"><span class="note">Se guarda en el historial con la fecha de hoy.</span><span class="spacer"></span><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="apply-preview">Aplicar ${ids.size > 1 ? `a ${ids.size} ingredientes` : "nuevo precio"}</button></div>`);
+  <div class="md-f"><span class="note">Se guarda en el historial con la fecha de hoy.</span><span class="spacer"></span><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="apply-preview">${keep ? "Aplicar costo y mantener precios" : `Aplicar ${ids.size > 1 ? `a ${ids.size} ingredientes` : "nuevo precio"}`}</button></div>`);
 }
 async function applyPrices(newPrices) {
   const now = new Date().toISOString(); const cambios = [];
@@ -571,6 +585,7 @@ function openRec(id, preset) {
     <div class="grid">
       <label class="f">La receta rinde<input class="in num" id="r-rinde" inputmode="decimal" value="${esc(fmtNum(parseNum(r.rinde) || 1))}"></label>
       <label class="f">Unidad de venta<input class="in" id="r-urinde" value="${esc(r.unidadRinde || "unidades")}" placeholder="unidades, porciones, tortas"></label>
+      <label class="f">Precio de venta fijo (opcional)<input class="in num" id="r-fijo" inputmode="decimal" value="${parseNum(r.precioFijo) > 0 ? esc(fmtNum(parseNum(r.precioFijo))) : ""}" placeholder="Vacío = usa el sugerido"></label>
       <label class="f">Margen de ganancia %<input class="in num" id="r-margen" inputmode="decimal" value="${r.margen === "" || r.margen == null ? "" : esc(fmtNum(parseNum(r.margen)))}" placeholder="${esc(fmtNum(parseNum(S.cfg.margen)))} (general)"></label>
     </div>
     <div><h3 style="margin-bottom:8px">Ingredientes</h3><div class="items tbl-wrap" id="r-items"></div>
@@ -607,7 +622,7 @@ function renderExtras() {
 function readRecHead() {
   recDraft.nombre = $("#r-nombre").value.trim(); recDraft.categoria = $("#r-cat").value.trim();
   recDraft.rinde = parseNum($("#r-rinde").value) || 1; recDraft.unidadRinde = $("#r-urinde").value.trim();
-  const m = $("#r-margen").value.trim(); recDraft.margen = m === "" ? "" : parseNum(m); recDraft.notas = $("#r-notas").value; recDraft.sinGastos = !$("#r-gastos").checked;
+  const m = $("#r-margen").value.trim(); recDraft.margen = m === "" ? "" : parseNum(m); recDraft.notas = $("#r-notas").value; recDraft.sinGastos = !$("#r-gastos").checked; recDraft.precioFijo = parseNum($("#r-fijo").value) > 0 ? parseNum($("#r-fijo").value) : "";
 }
 function updRecCalc() {
   const el = $("#r-calc"); if (!el) return; readRecHead();
@@ -616,7 +631,7 @@ function updRecCalc() {
   el.innerHTML = `<div><div class="k">Costo de la receta</div><div class="v num">${fmtMoney(c.total)}</div></div>
     <div><div class="k">Costo por unidad</div><div class="v num">${fmtMoney(c.costoU)}</div>${c.gastoU ? `<div class="note">${fmtMoney(c.costoReceta)} receta + ${fmtMoney(c.gastoU)} local</div>` : ""}</div>
     <div><div class="k">Precio sin IVA</div><div class="v num">${fmtMoney(c.precioSinIva)}</div>${c.iva ? `<div class="note">IVA ${fmtNum(c.iva)}%: ${fmtMoney(c.ivaMonto)}</div>` : ""}</div>
-    <div><div class="k">Precio final</div><div class="v big num">${fmtMoney(c.precio)}</div></div>
+    <div><div class="k">Precio final${c.fijo ? " (fijo)" : ""}</div><div class="v big num">${fmtMoney(c.precio)}</div>${c.fijo ? `<div class="note">Sugerido: ${fmtMoney(c.sugerido)} · margen real ${fmtNum(c.margenReal, 0)}% <button type="button" class="btn sm ghost" data-act="usar-sugerido">Usar sugerido</button></div>` : ""}</div>
     <div><div class="k">Ganás por unidad</div><div class="v num">${fmtMoney(c.ganancia)}</div></div>
     ${c.issues.filter(i => i.t !== "Sin ingredientes").length ? `<div style="grid-column:1/-1" class="warnbox">${esc([...new Set(c.issues.map(i => i.t))].join(" · "))}</div>` : ""}`;
 }
@@ -951,6 +966,7 @@ document.addEventListener("click", async e => {
     case "new-ing": openIng(null); break;
     case "edit-ing": openIng(id); break;
     case "new-prov": openProv(null, t.dataset.rubro); break;
+    case "usar-sugerido": $("#r-fijo").value = ""; updRecCalc(); break;
     case "ver-bajo": ui.catIng = "__bajo"; ui.sel.clear(); setTab("ingredientes"); break;
     case "producir": {
       const r = S.rec[recDraft.id]; const n = parseNum($("#r-tandas").value) || 0; if (!(n > 0)) { $("#r-tandas").focus(); break; }
@@ -978,7 +994,11 @@ document.addEventListener("click", async e => {
       if (!isFinite(v) || v === 0) { toast(ui.bulkMode === "pct" ? "Escribí el porcentaje de aumento, por ejemplo 15." : "Escribí el monto a sumar, por ejemplo 500."); $("#bulk-val").focus(); break; }
       const np = {}; ui.sel.forEach(id => { const o = parseNum(S.ing[id].precio) || 0; np[id] = Math.max(0, ui.bulkMode === "pct" ? o * (1 + v / 100) : o + v); });
       openPreview(np, ui.bulkMode === "pct" ? `Aumento de ${fmtNum(v)}% en ${ui.sel.size} ingrediente${ui.sel.size > 1 ? "s" : ""}` : `Sumar ${fmtMoney(v)} a ${ui.sel.size} ingrediente${ui.sel.size > 1 ? "s" : ""}`); break; }
-    case "apply-preview": { const np = ui.preview.newPrices; t.disabled = true; modal(""); ui.preview = null; await applyPrices(np); ui.sel.clear(); ui.bulkVal = ""; render(); break; }
+    case "apply-preview": { const np = ui.preview.newPrices, mode = ui.preview.mode; t.disabled = true; modal(""); ui.preview = null;
+      const afectadas = recipesUsing(new Set(Object.keys(np)));
+      if (mode === "mantener") { for (const [rid, r] of afectadas) if (!(parseNum(r.precioFijo) > 0)) await put("recetas", rid, { ...r, precioFijo: recCalc(r).precio }); }
+      else { for (const [rid, r] of afectadas) if (parseNum(r.precioFijo) > 0) await put("recetas", rid, { ...r, precioFijo: "" }); }
+      await applyPrices(np); ui.sel.clear(); ui.bulkVal = ""; render(); break; }
     case "ask-del-ing": $("#del-zone").innerHTML = `<span class="note">¿Borrar? </span><button type="button" class="btn danger" data-act="del-ing">Sí, borrar</button>`; break;
     case "del-ing": { const used = recipesUsing(new Set([ingDraft.id])); await del("ingredientes", ingDraft.id); closeModal(); toast(used.length ? `Borrado. Revisá ${used.length} receta${used.length > 1 ? "s" : ""} que lo usaba${used.length > 1 ? "n" : ""}.` : "Ingrediente borrado."); break; }
     case "ask-del-rec": $("#del-zone").innerHTML = `<span class="note">¿Borrar? </span><button type="button" class="btn danger" data-act="del-rec">Sí, borrar</button>`; break;
@@ -1024,6 +1044,7 @@ document.addEventListener("change", e => {
   else if (t.id === "cat-ing") { ui.catIng = t.value; ui.sel.clear(); renderIngRows(); }
   else if (t.id === "sel-all") { visibleIngs().forEach(([id]) => t.checked ? ui.sel.add(id) : ui.sel.delete(id)); renderIngRows(); }
   else if (t.id === "docx") handleDocx(t.files[0]);
+  else if (t.name === "pmode" && ui.preview) { ui.preview.mode = t.value; openPreview(ui.preview.newPrices, ui.preview.title); }
   else if (t.id === "r-gastos") updRecCalc();
   else if (t.dataset.item != null && t.tagName === "SELECT") { const it = recDraft.items[+t.dataset.item]; it[t.dataset.f] = t.value; if (t.dataset.f === "ingId" && S.ing[t.value]) { const dim = UNITS[S.ing[t.value].unidad].dim; if (UNITS[it.unidad].dim !== dim) it.unidad = dim === "u" ? "u" : "g"; } readRecHead(); renderItems(); updRecCalc(); }
   else if (t.dataset.draft != null && t.dataset.f === "incluir") { ui.drafts[+t.dataset.draft].incluir = t.checked; render(); }
