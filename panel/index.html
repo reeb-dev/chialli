@@ -1,0 +1,933 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"></head><body>
+<title>Chialli Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Zilla+Slab:wght@500;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: banda bordó con el sello de la marca arriba, pestañas de trabajo, y una sola columna de contenido sobre papel crema. */
+:root{
+  --bg:#FBF6EE; --surface:#FFFFFF; --cream:#F5EBDA; --ink:#2C1A1D; --muted:#7A6563;
+  --line:#E8DAC5; --bordo:#A3263A; --bordo-deep:#7B1828; --on-bordo:#FBF1E3; --wheat:#B98A3E;
+  --ok:#2F7A4F; --ok-bg:#E3F1E7; --warn:#9A5B00; --warn-bg:#FBEFD6; --bad:#B3261E; --bad-bg:#FBE4E1;
+  --up:#B3261E; --down:#2F7A4F; --shadow:0 1px 2px rgba(60,20,25,.06),0 6px 24px rgba(60,20,25,.08);
+  --f-brand:"Dancing Script","Brush Script MT",cursive;
+  --f-head:"Zilla Slab",Georgia,"Times New Roman",serif;
+  --f-body:"Alegreya Sans","Segoe UI",system-ui,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1B1214; --surface:#251A1D; --cream:#2F2125; --ink:#F3E7DA; --muted:#B9A49E;
+  --line:#3E2C30; --bordo:#D8566C; --bordo-deep:#5E1220; --on-bordo:#FBF1E3; --wheat:#D9AE63;
+  --ok:#7CCB98; --ok-bg:#1E3527; --warn:#F0B95C; --warn-bg:#3A2C12; --bad:#FF8A80; --bad-bg:#3D1C1A;
+  --up:#FF8A80; --down:#7CCB98; --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 24px rgba(0,0,0,.3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1B1214; --surface:#251A1D; --cream:#2F2125; --ink:#F3E7DA; --muted:#B9A49E;
+  --line:#3E2C30; --bordo:#D8566C; --bordo-deep:#5E1220; --on-bordo:#FBF1E3; --wheat:#D9AE63;
+  --ok:#7CCB98; --ok-bg:#1E3527; --warn:#F0B95C; --warn-bg:#3A2C12; --bad:#FF8A80; --bad-bg:#3D1C1A;
+  --up:#FF8A80; --down:#7CCB98; --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 24px rgba(0,0,0,.3); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-head);font-weight:600;text-wrap:balance;margin:0}
+h2{font-size:1.5rem}
+h3{font-size:1.15rem}
+
+/* Encabezado */
+.top{background:var(--bordo-deep);background:linear-gradient(180deg,#8E1E30,#7B1828);color:var(--on-bordo);padding-block:14px 0;padding-inline:16px}
+.top-in{max-width:1180px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}
+.seal{display:inline-flex;flex-direction:column;align-items:center;padding:4px 22px 6px;border:1.5px solid rgba(251,241,227,.65);border-radius:40px/50%;outline:3px solid rgba(251,241,227,.18);outline-offset:3px;line-height:1}
+.seal b{font-family:var(--f-brand);font-size:2.1rem;font-weight:700;letter-spacing:.5px}
+.seal small{font-family:var(--f-head);font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;margin-top:2px}
+.top-meta{flex:1;min-width:200px}
+.top-meta .t{font-family:var(--f-head);font-size:1.1rem}
+.top-meta .s{opacity:.8;font-size:.9rem}
+.chip-store{font-size:.8rem;border:1px solid rgba(251,241,227,.4);border-radius:99px;padding:3px 10px;white-space:nowrap}
+.tabs{max-width:1180px;margin:12px auto 0;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs button{background:none;border:0;color:var(--on-bordo);opacity:.78;padding:10px 16px;border-radius:10px 10px 0 0;cursor:pointer;font-weight:500;white-space:nowrap}
+.tabs button:hover{opacity:1}
+.tabs button[aria-selected="true"]{background:var(--bg);color:var(--ink);opacity:1;font-weight:700}
+.tabs .cnt{font-size:.75rem;opacity:.7;margin-left:4px}
+
+main{max-width:1180px;margin:0 auto;padding-block:22px 60px;padding-inline:16px;display:flex;flex-direction:column;gap:18px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.spacer{flex:1}
+.lead{color:var(--muted);max-width:68ch;margin:4px 0 0}
+
+/* Controles */
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:var(--bordo)}
+.btn.pri{background:var(--bordo);border-color:var(--bordo);color:#fff}
+:root[data-theme="dark"] .btn.pri{color:#1B1214}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.pri{color:#1B1214}}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.ghost{background:none;border-color:transparent;color:var(--bordo)}
+.btn.danger{color:var(--bad);border-color:var(--bad-bg)}
+.btn.sm{padding:4px 10px;font-size:.9rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--bordo);outline-offset:2px}
+.in,select.in,textarea.in{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;min-width:0}
+.in:focus{border-color:var(--bordo);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--bordo) 20%,transparent)}
+.search{flex:1;min-width:180px;max-width:360px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);font-weight:500}
+label.f .in{color:var(--ink);font-size:1rem}
+
+/* Resumen */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.stat .k{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.stat .v{font-family:var(--f-head);font-size:1.6rem;font-weight:600;margin-top:2px}
+.stat .d{font-size:.85rem;color:var(--muted)}
+
+/* Tablas */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--cream);white-space:nowrap}
+th:first-child{border-top-left-radius:var(--r)} th:last-child{border-top-right-radius:var(--r)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:color-mix(in srgb,var(--cream) 45%,transparent)}
+td.r,th.r{text-align:right}
+.name{font-weight:700}
+.sub{font-size:.85rem;color:var(--muted)}
+.price-in{width:110px;text-align:right}
+tr.sel td{background:color-mix(in srgb,var(--bordo) 8%,transparent)}
+.clickable{cursor:pointer}
+.clickable:hover .name{color:var(--bordo);text-decoration:underline}
+
+.pill{display:inline-block;font-size:.78rem;font-weight:700;border-radius:99px;padding:2px 9px;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.neu{background:var(--cream);color:var(--muted)}
+.up{color:var(--up)} .down{color:var(--down)}
+
+/* Barra de acción masiva */
+.bulk{position:sticky;bottom:12px;z-index:5;background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.bulk .in{background:var(--bg);color:var(--ink);width:90px}
+.bulk .btn{background:var(--bg);color:var(--ink);border-color:transparent}
+.bulk .btn.pri{background:var(--bordo);color:#fff}
+.seg{display:inline-flex;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.25)}
+.seg button{background:none;border:0;color:inherit;padding:6px 10px;cursor:pointer;font-size:.9rem}
+.seg button[aria-pressed="true"]{background:var(--bg);color:var(--ink);font-weight:700}
+
+/* Vacío */
+.empty{padding:36px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.empty p{color:var(--muted);max-width:52ch;margin:0}
+
+/* Modal */
+.ov{position:fixed;inset:0;background:rgba(30,10,14,.45);z-index:20;display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow-y:auto}
+.md{background:var(--bg);border-radius:14px;width:min(900px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35);display:flex;flex-direction:column}
+.md-h{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.md-b{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.md-f{padding:14px 20px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.grid.g2{grid-template-columns:2fr 1fr}
+@media (max-width:560px){.grid.g2{grid-template-columns:1fr}}
+.items td{padding:6px 6px}
+.items .in{width:100%}
+.items table{min-width:560px}
+.calc{background:var(--cream);border-radius:var(--r);padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.calc .k{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.calc .v{font-family:var(--f-head);font-size:1.35rem;font-weight:600}
+.calc .v.big{color:var(--bordo);font-size:1.7rem}
+.note{font-size:.9rem;color:var(--muted)}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:.92rem}
+.okbox{background:var(--ok-bg);color:var(--ok);border-radius:8px;padding:8px 12px;font-size:.92rem}
+
+/* Importar */
+.drop{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;background:var(--surface);display:flex;flex-direction:column;gap:10px;align-items:center}
+.drop.over{border-color:var(--bordo);background:var(--cream)}
+.drop .big{font-family:var(--f-head);font-size:1.2rem}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.orig{font-size:.85rem;color:var(--muted);font-style:italic}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:calc(100% - 32px)}
+.hist-day{font-family:var(--f-head);font-weight:600;padding:10px 12px;background:var(--cream)}
+@media (prefers-reduced-motion:no-preference){.toast{animation:pop .2s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="seal" aria-label="Chialli, libre de gluten"><b>Chialli</b><small>Libre de gluten</small></div>
+    <div class="top-meta"><div class="t">Recetas y costos</div><div class="s">Sierra de la Ventana</div></div>
+    <span class="chip-store" id="store-chip">Conectando…</span>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+</header>
+<main id="view"></main>
+<div id="modal"></div>
+<div id="toast-slot"></div>
+
+<script>
+"use strict";
+/* ====================== Utilidades ====================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const fmtMoney = n => { if (n == null || !isFinite(n)) return "—"; const big = Math.abs(n) >= 1000; return (S.cfg.moneda || "$") + " " + n.toLocaleString("es-AR", { minimumFractionDigits: !big && n % 1 ? 2 : 0, maximumFractionDigits: big ? 0 : 2 }); };
+const fmtNum = (n, d = 2) => (n == null || !isFinite(n)) ? "—" : n.toLocaleString("es-AR", { maximumFractionDigits: d });
+const fmtPct = n => (n > 0 ? "+" : "") + fmtNum(n, 1) + "%";
+function parseNum(s) {
+  if (typeof s === "number") return s;
+  s = String(s ?? "").trim().replace(/\s/g, "").replace(/^\$/, "");
+  if (!s) return NaN;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  return parseFloat(s);
+}
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ ]+/g, " ").replace(/\s+/g, " ").trim();
+const fmtDate = iso => { try { return new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" }); } catch { return ""; } };
+const fmtTime = iso => { try { return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+
+/* Unidades: masa y volumen se tratan como equivalentes (1 g ≈ 1 ml). */
+const UNITS = {
+  kg: { dim: "m", f: 1000, label: "kg" }, g: { dim: "m", f: 1, label: "g" },
+  l: { dim: "m", f: 1000, label: "litro" }, ml: { dim: "m", f: 1, label: "ml" },
+  u: { dim: "u", f: 1, label: "unidad" }, doc: { dim: "u", f: 12, label: "docena" },
+  cda: { dim: "m", f: 15, label: "cucharada" }, cdta: { dim: "m", f: 5, label: "cucharadita" }, taza: { dim: "m", f: 240, label: "taza" },
+};
+const BUY_UNITS = ["kg", "g", "l", "ml", "u", "doc"];
+const USE_UNITS = ["g", "kg", "ml", "l", "u", "cda", "cdta", "taza"];
+const costLabel = ing => UNITS[ing.unidad]?.dim === "u" ? "por unidad" : (ing.unidad === "l" || ing.unidad === "ml" ? "por litro" : "por kg");
+
+/* ====================== Estado y guardado ====================== */
+const S = { mode: "init", ing: {}, rec: {}, hist: [], cfg: { margen: 120, redondeo: 50, moneda: "$", iva: 21, gastos: [], unidadesMes: "" } };
+const DEFAULT_CFG = { margen: 120, redondeo: 50, moneda: "$", iva: 21, gastos: [], unidadesMes: "" };
+const ui = { gastos: [], tab: "productos", qIng: "", catIng: "", sel: new Set(), bulkMode: "pct", bulkVal: "", preview: null, qRec: "", catRec: "", drafts: null, importMsg: "" };
+try { const t = localStorage.getItem("chialli-tab"); if (t) ui.tab = t; } catch {}
+let db = null;
+const LS_KEY = "chialli-panel-v1";
+
+function lsLoad() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+    if (d) { S.ing = d.ing || {}; S.rec = d.rec || {}; S.hist = d.hist || []; S.cfg = { ...DEFAULT_CFG, ...(d.cfg || {}) }; }
+  } catch {}
+}
+function lsSave() { try { localStorage.setItem(LS_KEY, JSON.stringify({ ing: S.ing, rec: S.rec, hist: S.hist, cfg: S.cfg })); } catch {} }
+
+async function put(col, id, data) {
+  const map = col === "ingredientes" ? S.ing : S.rec;
+  map[id] = data;
+  if (db) await db.collection(col).doc(id).set(data);
+  else lsSave();
+}
+async function del(col, id) {
+  const map = col === "ingredientes" ? S.ing : S.rec;
+  delete map[id];
+  if (db) await db.collection(col).doc(id).delete();
+  else lsSave();
+}
+async function addHist(entries) {
+  // Un documento por actualización (puede contener varios cambios), para no crecer de a uno.
+  if (!entries.length) return;
+  const h = { id: uid(), fecha: new Date().toISOString(), cambios: entries };
+  S.hist.unshift(h);
+  if (db) await db.collection("historial").doc(h.id).set({ fecha: h.fecha, cambios: h.cambios });
+  else lsSave();
+}
+async function saveCfg(c) {
+  S.cfg = { ...S.cfg, ...c };
+  if (db) await db.doc("config/general").set(S.cfg);
+  else lsSave();
+}
+
+let renderQueued = false;
+function scheduleRender() {
+  if (renderQueued) return; renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; const a = document.activeElement; if (a && a.dataset && a.dataset.live) { pendingRender = true; return; } render(); });
+}
+let pendingRender = false;
+document.addEventListener("focusout", () => { if (pendingRender) { pendingRender = false; setTimeout(scheduleRender, 0); } });
+
+async function initStore() {
+  let api = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    try { api = await window.claude.use("db"); } catch { api = null; }
+  }
+  if (api) {
+    db = api; S.mode = "db";
+    const fail = e => { if (e && e.code === "revoked") { S.mode = "readonly"; render(); } };
+    db.collection("ingredientes").onSnapshot(s => { const m = {}; s.docs.forEach(d => m[d.id] = d.data()); S.ing = m; scheduleRender(); }, fail);
+    db.collection("recetas").onSnapshot(s => { const m = {}; s.docs.forEach(d => m[d.id] = d.data()); S.rec = m; scheduleRender(); }, fail);
+    db.collection("historial").orderBy("fecha", "desc").limit(150).onSnapshot(s => { S.hist = s.docs.map(d => ({ id: d.id, ...d.data() })); scheduleRender(); }, fail);
+    db.doc("config/general").onSnapshot(s => { S.cfg = { ...DEFAULT_CFG, ...(s.exists ? s.data() : {}) }; scheduleRender(); }, fail);
+  } else {
+    S.mode = "local"; lsLoad();
+  }
+  render();
+}
+
+/* ====================== Cálculos ====================== */
+function unitCost(ing) {
+  // costo por unidad base (g/ml o unidad)
+  const u = UNITS[ing?.unidad]; const q = parseNum(ing?.cantidad); const p = parseNum(ing?.precio);
+  if (!u || !(q > 0) || !(p >= 0)) return NaN;
+  return p / (q * u.f);
+}
+function itemCalc(it, getIng) {
+  const ing = getIng(it.ingId);
+  if (!ing) return { cost: 0, err: "Ingrediente borrado" };
+  const qty = parseNum(it.cantidad);
+  if (!(qty > 0)) return { cost: 0, info: "sin cantidad" };
+  const uu = UNITS[it.unidad], bu = UNITS[ing.unidad];
+  if (!uu || !bu) return { cost: 0, err: "Unidad desconocida" };
+  if (uu.dim !== bu.dim) return { cost: 0, err: `Se compra por ${bu.label}, se usa en ${uu.label}` };
+  if (!(parseNum(ing.precio) > 0)) return { cost: 0, warn: "Sin precio" };
+  return { cost: qty * uu.f * unitCost(ing) };
+}
+function gastosMes() { return (S.cfg.gastos || []).reduce((a, g) => a + (parseNum(g.monto) || 0), 0); }
+function gastoLocalU() { const u = parseNum(S.cfg.unidadesMes); return u > 0 ? gastosMes() / u : 0; }
+function roundPrice(x) { const r = parseNum(S.cfg.redondeo) || 0; return r > 0 ? Math.ceil(x / r) * r : Math.round(x * 100) / 100; }
+function recCalc(r, overrides) {
+  const getIng = id => (overrides && overrides[id]) || S.ing[id];
+  let ingCost = 0; const issues = [];
+  (r.items || []).forEach(it => { const c = itemCalc(it, getIng); ingCost += c.cost || 0; if (c.err) issues.push({ lvl: "bad", t: c.err }); if (c.warn) issues.push({ lvl: "warn", t: (getIng(it.ingId)?.nombre || "") + ": sin precio" }); });
+  const extras = (r.extras || []).reduce((a, e) => a + (parseNum(e.monto) || 0), 0);
+  const total = ingCost + extras;
+  const rinde = parseNum(r.rinde) > 0 ? parseNum(r.rinde) : 1;
+  const costoReceta = total / rinde;
+  const gastoU = r.sinGastos ? 0 : gastoLocalU();
+  const costoU = costoReceta + gastoU;
+  const margen = parseNum(r.margen); const m = isFinite(margen) ? margen : parseNum(S.cfg.margen) || 0;
+  const iva = Math.max(0, parseNum(S.cfg.iva) || 0);
+  // El redondeo se aplica al precio final (el que ve el cliente); el precio sin IVA se deriva de él.
+  const precio = total > 0 ? roundPrice(costoU * (1 + m / 100) * (1 + iva / 100)) : 0;
+  const precioSinIva = precio / (1 + iva / 100);
+  if (!(r.items || []).length) issues.push({ lvl: "warn", t: "Sin ingredientes" });
+  return { ingCost, extras, total, rinde, costoReceta, gastoU, costoU, margen: m, iva, precio, precioSinIva, ivaMonto: precio - precioSinIva, ganancia: precioSinIva - costoU, issues };
+}
+function statusPill(c) {
+  if (c.issues.some(i => i.lvl === "bad")) return `<span class="pill bad" title="${esc(c.issues.map(i => i.t).join(" · "))}">Revisar unidades</span>`;
+  if (c.issues.length) return `<span class="pill warn" title="${esc(c.issues.map(i => i.t).join(" · "))}">${esc(c.issues[0].t.includes("sin precio") ? "Falta un precio" : c.issues[0].t)}</span>`;
+  return `<span class="pill ok">Al día</span>`;
+}
+const recipesUsing = ids => Object.entries(S.rec).filter(([, r]) => (r.items || []).some(it => ids.has(it.ingId)));
+const sortByName = (a, b) => (a[1].nombre || "").localeCompare(b[1].nombre || "", "es");
+
+/* ====================== Render ====================== */
+const TABS = [["productos", "Productos"], ["ingredientes", "Ingredientes"], ["importar", "Importar Word"], ["historial", "Historial"], ["ajustes", "Ajustes"]];
+function render() {
+  const ni = Object.keys(S.ing).length, nr = Object.keys(S.rec).length;
+  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-act="tab" data-k="${k}" aria-selected="${ui.tab === k}">${l}${k === "productos" && nr ? `<span class="cnt">${nr}</span>` : ""}${k === "ingredientes" && ni ? `<span class="cnt">${ni}</span>` : ""}</button>`).join("");
+  $("#store-chip").textContent = S.mode === "db" ? "Guardado en la nube" : S.mode === "local" ? "Guardado en este navegador" : S.mode === "readonly" ? "Solo lectura" : "Conectando…";
+  const v = $("#view");
+  if (S.mode === "init") { v.innerHTML = `<div class="panel empty"><p>Cargando tus recetas…</p></div>`; return; }
+  v.innerHTML = ({ productos: viewProductos, ingredientes: viewIngredientes, importar: viewImportar, historial: viewHistorial, ajustes: viewAjustes }[ui.tab] || viewProductos)();
+  if (ui.tab === "ingredientes") renderIngRows();
+  if (ui.tab === "productos") renderRecRows();
+  if (ui.tab === "ajustes") updGastosCalc();
+}
+
+function emptyStart() {
+  return `<div class="panel empty">
+    <h2>Empecemos por la despensa</h2>
+    <p>Cargá tus ingredientes con el precio al que los comprás. Después armá cada receta y el panel calcula solo el costo y el precio de venta.</p>
+    <div class="row" style="justify-content:center">
+      <button class="btn pri" data-act="new-ing">Agregar ingrediente</button>
+      <button class="btn" data-act="tab" data-k="importar">Importar recetas de Word</button>
+      <button class="btn ghost" data-act="seed">Cargar ejemplos para probar</button>
+    </div></div>`;
+}
+
+/* ---------- Productos ---------- */
+function viewProductos() {
+  const recs = Object.entries(S.rec);
+  if (!recs.length && !Object.keys(S.ing).length) return emptyStart();
+  const calcs = recs.map(([id, r]) => recCalc(r));
+  const okCount = calcs.filter(c => !c.issues.length).length;
+  const last = S.hist[0];
+  const cats = [...new Set(recs.map(([, r]) => r.categoria).filter(Boolean))].sort();
+  const priced = calcs.filter(c => c.precio > 0 && c.costoU > 0); const avgMargin = priced.length ? priced.reduce((a, c) => a + (c.precioSinIva - c.costoU) / c.precioSinIva * 100, 0) / priced.length : 0;
+  return `
+  <div class="row"><div><h2>Productos</h2><p class="lead">Cada receta calcula su costo con los precios actuales de los ingredientes. Si cambiás un precio, todo se recalcula al instante.</p></div></div>
+  <div class="stats">
+    <div class="stat"><div class="k">Productos</div><div class="v num">${recs.length}</div><div class="d">${okCount} al día${recs.length - okCount ? `, ${recs.length - okCount} para revisar` : ""}</div></div>
+    <div class="stat"><div class="k">Ingredientes</div><div class="v num">${Object.keys(S.ing).length}</div><div class="d">${Object.values(S.ing).filter(i => !(parseNum(i.precio) > 0)).length} sin precio</div></div>
+    <div class="stat"><div class="k">Ganancia media</div><div class="v num">${fmtNum(avgMargin, 0)}%</div><div class="d">sobre el precio de venta</div></div>
+    <div class="stat"><div class="k">Último cambio de precios</div><div class="v" style="font-size:1.15rem">${last ? fmtDate(last.fecha) : "—"}</div><div class="d">${last ? `${last.cambios.length} ingrediente${last.cambios.length > 1 ? "s" : ""}` : "Todavía no hubo cambios"}</div></div>
+  </div>
+  <div class="row">
+    <input class="in search" id="q-rec" data-live="1" placeholder="Buscar producto…" value="${esc(ui.qRec)}" aria-label="Buscar producto">
+    ${cats.length ? `<select class="in" id="cat-rec" aria-label="Categoría"><option value="">Todas las categorías</option>${cats.map(c => `<option ${c === ui.catRec ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>` : ""}
+    <span class="spacer"></span>
+    <button class="btn" data-act="tab" data-k="importar">Importar de Word</button>
+    <button class="btn pri" data-act="new-rec">Nueva receta</button>
+  </div>
+  <div class="panel tbl-wrap"><table>
+    <thead><tr><th>Producto</th><th class="r">Rinde</th><th class="r">Costo receta</th><th class="r">Costo x u.</th><th class="r">Margen</th><th class="r">Precio final x u.</th><th>Estado</th></tr></thead>
+    <tbody id="rec-rows"></tbody></table></div>`;
+}
+function renderRecRows() {
+  const tb = $("#rec-rows"); if (!tb) return;
+  const q = norm(ui.qRec);
+  const rows = Object.entries(S.rec).sort(sortByName).filter(([, r]) => (!q || norm(r.nombre + " " + (r.categoria || "")).includes(q)) && (!ui.catRec || r.categoria === ui.catRec));
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="7"><div class="empty"><p>${Object.keys(S.rec).length ? "No hay productos que coincidan con la búsqueda." : "Todavía no hay recetas. Creá la primera o importala desde Word."}</p>${Object.keys(S.rec).length ? "" : `<button class="btn pri" data-act="new-rec">Nueva receta</button>`}</div></td></tr>`; return; }
+  tb.innerHTML = rows.map(([id, r]) => { const c = recCalc(r); return `
+    <tr class="clickable" data-act="edit-rec" data-id="${id}">
+      <td><div class="name">${esc(r.nombre)}</div><div class="sub">${esc(r.categoria || "Sin categoría")} · ${(r.items || []).length} ingredientes</div></td>
+      <td class="r num">${fmtNum(c.rinde)} <span class="sub">${esc(r.unidadRinde || "u.")}</span></td>
+      <td class="r num">${fmtMoney(c.total)}</td>
+      <td class="r num">${fmtMoney(c.costoU)}${c.gastoU ? `<div class="sub">incl. ${fmtMoney(c.gastoU)} del local</div>` : ""}</td>
+      <td class="r num">${fmtNum(c.margen, 0)}%</td>
+      <td class="r num"><b>${fmtMoney(c.precio)}</b>${c.iva ? `<div class="sub">${fmtMoney(c.precioSinIva)} + IVA</div>` : ""}</td>
+      <td>${statusPill(c)}</td></tr>`; }).join("");
+}
+
+/* ---------- Ingredientes ---------- */
+function viewIngredientes() {
+  const all = Object.entries(S.ing);
+  if (!all.length) return emptyStart();
+  const cats = [...new Set(all.map(([, i]) => i.categoria).filter(Boolean))].sort();
+  const provs = [...new Set(all.map(([, i]) => i.proveedor).filter(Boolean))].sort();
+  return `
+  <div><h2>Ingredientes</h2><p class="lead">Cambiá un precio directamente en la tabla, o marcá varios ingredientes para aumentarlos juntos. Antes de aplicar ves cómo quedan los productos.</p></div>
+  <div class="row">
+    <input class="in search" id="q-ing" data-live="1" placeholder="Buscar ingrediente o proveedor…" value="${esc(ui.qIng)}" aria-label="Buscar ingrediente">
+    <select class="in" id="cat-ing" aria-label="Filtrar"><option value="">Todos</option>
+      <option value="__sin" ${ui.catIng === "__sin" ? "selected" : ""}>Sin precio</option>
+      ${cats.length ? `<optgroup label="Categoría">${cats.map(c => `<option value="c:${esc(c)}" ${"c:" + c === ui.catIng ? "selected" : ""}>${esc(c)}</option>`).join("")}</optgroup>` : ""}
+      ${provs.length ? `<optgroup label="Proveedor">${provs.map(c => `<option value="p:${esc(c)}" ${"p:" + c === ui.catIng ? "selected" : ""}>${esc(c)}</option>`).join("")}</optgroup>` : ""}
+    </select>
+    <span class="spacer"></span>
+    <button class="btn pri" data-act="new-ing">Agregar ingrediente</button>
+  </div>
+  <div class="panel tbl-wrap"><table>
+    <thead><tr><th style="width:36px"><input type="checkbox" id="sel-all" aria-label="Seleccionar todos los visibles"></th><th>Ingrediente</th><th>Presentación</th><th class="r">Precio de compra</th><th class="r">Costo</th><th class="r">Usado en</th><th></th></tr></thead>
+    <tbody id="ing-rows"></tbody></table></div>
+  <div id="bulk-slot"></div>`;
+}
+function visibleIngs() {
+  const q = norm(ui.qIng), f = ui.catIng;
+  return Object.entries(S.ing).sort(sortByName).filter(([, i]) =>
+    (!q || norm(i.nombre + " " + (i.proveedor || "") + " " + (i.categoria || "")).includes(q)) &&
+    (!f || (f === "__sin" ? !(parseNum(i.precio) > 0) : f.startsWith("c:") ? i.categoria === f.slice(2) : i.proveedor === f.slice(2))));
+}
+function renderIngRows() {
+  const tb = $("#ing-rows"); if (!tb) return;
+  const rows = visibleIngs();
+  const usage = {}; Object.values(S.rec).forEach(r => new Set((r.items || []).map(i => i.ingId)).forEach(id => usage[id] = (usage[id] || 0) + 1));
+  tb.innerHTML = rows.length ? rows.map(([id, i]) => { const uc = unitCost(i); const per = UNITS[i.unidad]?.dim === "u" ? uc : uc * 1000; const sinP = !(parseNum(i.precio) > 0); return `
+    <tr class="${ui.sel.has(id) ? "sel" : ""}">
+      <td><input type="checkbox" data-act="sel" data-id="${id}" ${ui.sel.has(id) ? "checked" : ""} aria-label="Seleccionar ${esc(i.nombre)}"></td>
+      <td><div class="name">${esc(i.nombre)}</div><div class="sub">${esc([i.categoria, i.proveedor].filter(Boolean).join(" · ") || "—")}${i.ejemplo ? ` · <span class="pill neu">ejemplo</span>` : ""}</div></td>
+      <td class="num">${fmtNum(parseNum(i.cantidad))} ${esc(UNITS[i.unidad]?.label || i.unidad)}${parseNum(i.cantidad) > 1 && UNITS[i.unidad]?.dim === "u" ? "es" : ""}</td>
+      <td class="r"><input class="in price-in num" data-live="1" data-act="price" data-id="${id}" inputmode="decimal" value="${sinP ? "" : esc(fmtNum(parseNum(i.precio)))}" placeholder="Sin precio" aria-label="Precio de ${esc(i.nombre)}"></td>
+      <td class="r num">${sinP ? `<span class="pill warn">Falta precio</span>` : `${fmtMoney(per)} <span class="sub">${costLabel(i)}</span>`}</td>
+      <td class="r num">${usage[id] ? `${usage[id]} producto${usage[id] > 1 ? "s" : ""}` : `<span class="sub">—</span>`}</td>
+      <td class="r"><button class="btn sm ghost" data-act="edit-ing" data-id="${id}">Editar</button></td></tr>`; }).join("")
+    : `<tr><td colspan="7"><div class="empty"><p>No hay ingredientes que coincidan.</p></div></td></tr>`;
+  const sa = $("#sel-all"); if (sa) { const vis = rows.map(r => r[0]); sa.checked = vis.length > 0 && vis.every(id => ui.sel.has(id)); sa.indeterminate = !sa.checked && vis.some(id => ui.sel.has(id)); }
+  renderBulk();
+}
+function renderBulk() {
+  const slot = $("#bulk-slot"); if (!slot) return;
+  [...ui.sel].forEach(id => { if (!S.ing[id]) ui.sel.delete(id); });
+  if (!ui.sel.size) { slot.innerHTML = ""; return; }
+  const n = ui.sel.size;
+  slot.innerHTML = `<div class="bulk" role="region" aria-label="Actualizar seleccionados">
+    <b>${n} seleccionado${n > 1 ? "s" : ""}</b>
+    <span class="seg" role="group" aria-label="Tipo de cambio">
+      <button data-act="bulk-mode" data-k="pct" aria-pressed="${ui.bulkMode === "pct"}">Aumentar %</button>
+      <button data-act="bulk-mode" data-k="monto" aria-pressed="${ui.bulkMode === "monto"}">Sumar $</button>
+    </span>
+    <input class="in num" id="bulk-val" inputmode="decimal" placeholder="${ui.bulkMode === "pct" ? "ej. 15" : "ej. 500"}" value="${esc(ui.bulkVal)}" aria-label="Valor del aumento">
+    <span class="sub" style="color:inherit;opacity:.75">${ui.bulkMode === "pct" ? "Usá un número negativo para bajar." : "Se suma al precio de compra."}</span>
+    <span class="spacer"></span>
+    <button class="btn" data-act="bulk-clear">Quitar selección</button>
+    <button class="btn pri" data-act="bulk-preview">Ver cómo quedan los precios</button>
+  </div>`;
+}
+
+/* ---------- Vista previa de cambios (individual o masivo) ---------- */
+function openPreview(newPrices, title) {
+  // newPrices: {ingId: nuevoPrecio}
+  const ids = new Set(Object.keys(newPrices));
+  const overrides = {}; ids.forEach(id => overrides[id] = { ...S.ing[id], precio: newPrices[id] });
+  const affected = recipesUsing(ids).sort(sortByName).map(([id, r]) => { const a = recCalc(r), b = recCalc(r, overrides); return { id, r, a, b }; });
+  ui.preview = { newPrices, title };
+  modal(`<div class="md-h"><h3>${esc(title)}</h3><span class="spacer"></span><button class="btn ghost" data-act="close">Cerrar</button></div>
+  <div class="md-b">
+    <div class="tbl-wrap"><table style="min-width:420px"><thead><tr><th>Ingrediente</th><th class="r">Precio actual</th><th class="r">Precio nuevo</th><th class="r">Cambio</th></tr></thead><tbody>
+      ${[...ids].map(id => { const o = parseNum(S.ing[id].precio) || 0, n = newPrices[id]; const p = o ? (n - o) / o * 100 : 0; return `<tr><td class="name">${esc(S.ing[id].nombre)}</td><td class="r num">${fmtMoney(o)}</td><td class="r num"><b>${fmtMoney(n)}</b></td><td class="r num ${p > 0 ? "up" : p < 0 ? "down" : ""}">${o ? fmtPct(p) : "nuevo"}</td></tr>`; }).join("")}
+    </tbody></table></div>
+    <h3>Productos que cambian de precio (${affected.length})</h3>
+    ${affected.length ? `<div class="tbl-wrap"><table style="min-width:520px"><thead><tr><th>Producto</th><th class="r">Costo x u.</th><th class="r">Precio actual</th><th class="r">Precio nuevo</th><th class="r">Cambio</th></tr></thead><tbody>
+      ${affected.map(x => { const p = x.a.precio ? (x.b.precio - x.a.precio) / x.a.precio * 100 : 0; return `<tr><td class="name">${esc(x.r.nombre)}</td><td class="r num">${fmtMoney(x.a.costoU)} → ${fmtMoney(x.b.costoU)}</td><td class="r num">${fmtMoney(x.a.precio)}</td><td class="r num"><b>${fmtMoney(x.b.precio)}</b></td><td class="r num ${p > 0 ? "up" : p < 0 ? "down" : ""}">${fmtPct(p)}</td></tr>`; }).join("")}
+    </tbody></table></div>` : `<p class="note">Ningún producto usa estos ingredientes todavía.</p>`}
+  </div>
+  <div class="md-f"><span class="note">Se guarda en el historial con la fecha de hoy.</span><span class="spacer"></span><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="apply-preview">Aplicar ${ids.size > 1 ? `a ${ids.size} ingredientes` : "nuevo precio"}</button></div>`);
+}
+async function applyPrices(newPrices) {
+  const now = new Date().toISOString(); const cambios = [];
+  const ids = new Set(Object.keys(newPrices));
+  const before = Object.fromEntries(recipesUsing(ids).map(([id, r]) => [id, recCalc(r).precio]));
+  await Promise.all([...ids].map(id => { const i = S.ing[id]; const o = parseNum(i.precio) || 0; const n = Math.round(newPrices[id] * 100) / 100; if (o === n) return null; cambios.push({ ingId: id, nombre: i.nombre, antes: o, despues: n }); return put("ingredientes", id, { ...i, precio: n, actualizado: now }); }));
+  await addHist(cambios);
+  const changed = Object.entries(before).filter(([id, p]) => S.rec[id] && recCalc(S.rec[id]).precio !== p).length;
+  toast(cambios.length ? `Listo: ${cambios.length} precio${cambios.length > 1 ? "s" : ""} actualizado${cambios.length > 1 ? "s" : ""}${changed ? `, ${changed} producto${changed > 1 ? "s" : ""} con precio nuevo` : ""}.` : "No había cambios para guardar.");
+}
+
+/* ---------- Editor de ingrediente ---------- */
+let ingDraft = null;
+function openIng(id) {
+  const i = id ? S.ing[id] : { nombre: "", categoria: "", proveedor: "", cantidad: 1, unidad: "kg", precio: "" };
+  ingDraft = { id, ...JSON.parse(JSON.stringify(i)) };
+  const cats = [...new Set(Object.values(S.ing).map(x => x.categoria).filter(Boolean))];
+  const provs = [...new Set(Object.values(S.ing).map(x => x.proveedor).filter(Boolean))];
+  const used = id ? recipesUsing(new Set([id])) : [];
+  modal(`<form id="ing-form"><div class="md-h"><h3>${id ? "Editar ingrediente" : "Nuevo ingrediente"}</h3><span class="spacer"></span><button type="button" class="btn ghost" data-act="close">Cerrar</button></div>
+  <div class="md-b">
+    <div class="grid g2"><label class="f">Nombre<input class="in" id="i-nombre" required value="${esc(i.nombre)}" placeholder="ej. Harina de arroz"></label>
+    <label class="f">Categoría<input class="in" id="i-cat" list="dl-cat" value="${esc(i.categoria || "")}" placeholder="ej. Harinas"></label></div>
+    <datalist id="dl-cat">${cats.map(c => `<option value="${esc(c)}">`).join("")}</datalist>
+    <datalist id="dl-prov">${provs.map(c => `<option value="${esc(c)}">`).join("")}</datalist>
+    <div class="grid">
+      <label class="f">Lo compro en paquetes de<input class="in num" id="i-cant" inputmode="decimal" required value="${esc(fmtNum(parseNum(i.cantidad)))}"></label>
+      <label class="f">Unidad<select class="in" id="i-unid">${BUY_UNITS.map(u => `<option value="${u}" ${u === i.unidad ? "selected" : ""}>${UNITS[u].label}</option>`).join("")}</select></label>
+      <label class="f">Precio del paquete<input class="in num" id="i-precio" inputmode="decimal" value="${parseNum(i.precio) > 0 ? esc(fmtNum(parseNum(i.precio))) : ""}" placeholder="0"></label>
+      <label class="f">Proveedor<input class="in" id="i-prov" list="dl-prov" value="${esc(i.proveedor || "")}" placeholder="opcional"></label>
+    </div>
+    <div class="calc" id="i-calc"></div>
+    ${used.length ? `<p class="note">Se usa en: ${used.map(([, r]) => esc(r.nombre)).join(", ")}.</p>` : ""}
+  </div>
+  <div class="md-f">${id ? `<span id="del-zone"><button type="button" class="btn danger" data-act="ask-del-ing">Borrar</button></span>` : ""}<span class="spacer"></span><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`);
+  updIngCalc(); $("#i-nombre").focus();
+}
+function readIng() { return { nombre: $("#i-nombre").value.trim(), categoria: $("#i-cat").value.trim(), proveedor: $("#i-prov").value.trim(), cantidad: parseNum($("#i-cant").value), unidad: $("#i-unid").value, precio: parseNum($("#i-precio").value) || 0 }; }
+function updIngCalc() {
+  const el = $("#i-calc"); if (!el) return; const i = readIng(); const uc = unitCost(i);
+  const dimU = UNITS[i.unidad].dim === "u";
+  el.innerHTML = `<div><div class="k">Costo ${costLabel(i)}</div><div class="v num">${isFinite(uc) && i.precio > 0 ? fmtMoney(dimU ? uc : uc * 1000) : "—"}</div></div>
+    <div><div class="k">${dimU ? "Costo por unidad" : "Costo por 100 g"}</div><div class="v num">${isFinite(uc) && i.precio > 0 ? fmtMoney(dimU ? uc : uc * 100) : "—"}</div></div>`;
+}
+
+/* ---------- Editor de receta ---------- */
+let recDraft = null;
+function openRec(id, preset) {
+  const r = preset || (id ? S.rec[id] : { nombre: "", categoria: "", rinde: 1, unidadRinde: "unidades", margen: "", items: [], extras: [], notas: "" });
+  recDraft = { id, ...JSON.parse(JSON.stringify(r)) };
+  if (!recDraft.items.length) recDraft.items.push({ ingId: "", cantidad: "", unidad: "g" });
+  const cats = [...new Set(Object.values(S.rec).map(x => x.categoria).filter(Boolean))];
+  modal(`<form id="rec-form"><div class="md-h"><h3>${id ? "Editar receta" : "Nueva receta"}</h3><span class="spacer"></span><button type="button" class="btn ghost" data-act="close">Cerrar</button></div>
+  <div class="md-b">
+    <div class="grid g2"><label class="f">Nombre del producto<input class="in" id="r-nombre" required value="${esc(r.nombre)}" placeholder="ej. Alfajor de maicena"></label>
+    <label class="f">Categoría<input class="in" id="r-cat" list="dl-rcat" value="${esc(r.categoria || "")}" placeholder="ej. Alfajores"></label></div>
+    <datalist id="dl-rcat">${cats.map(c => `<option value="${esc(c)}">`).join("")}</datalist>
+    <div class="grid">
+      <label class="f">La receta rinde<input class="in num" id="r-rinde" inputmode="decimal" value="${esc(fmtNum(parseNum(r.rinde) || 1))}"></label>
+      <label class="f">Unidad de venta<input class="in" id="r-urinde" value="${esc(r.unidadRinde || "unidades")}" placeholder="unidades, porciones, tortas"></label>
+      <label class="f">Margen de ganancia %<input class="in num" id="r-margen" inputmode="decimal" value="${r.margen === "" || r.margen == null ? "" : esc(fmtNum(parseNum(r.margen)))}" placeholder="${esc(fmtNum(parseNum(S.cfg.margen)))} (general)"></label>
+    </div>
+    <div><h3 style="margin-bottom:8px">Ingredientes</h3><div class="items tbl-wrap" id="r-items"></div>
+      <div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-act="add-item">+ Agregar ingrediente</button><button type="button" class="btn sm ghost" data-act="new-ing-inline">Crear ingrediente nuevo</button></div></div>
+    <div><h3 style="margin-bottom:4px">Otros costos de la tanda</h3><p class="note" style="margin:0 0 8px">Packaging, gas, mano de obra. Se reparten entre las unidades que rinde.</p><div id="r-extras" class="items"></div>
+      <button type="button" class="btn sm" data-act="add-extra" style="margin-top:8px">+ Agregar costo</button></div>
+    <label class="row" style="gap:8px"><input type="checkbox" id="r-gastos" ${r.sinGastos ? "" : "checked"}> Sumar gastos del local (${gastoLocalU() ? fmtMoney(gastoLocalU()) + " por unidad" : "configuralos en Ajustes"})</label>
+    <div class="calc" id="r-calc"></div>
+    <label class="f">Preparación y notas<textarea class="in" id="r-notas" rows="4">${esc(r.notas || "")}</textarea></label>
+  </div>
+  <div class="md-f">${id ? `<span id="del-zone"><button type="button" class="btn danger" data-act="ask-del-rec">Borrar</button></span><button type="button" class="btn" data-act="dup-rec">Duplicar</button>` : ""}<span class="spacer"></span><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn pri" type="submit">Guardar receta</button></div></form>`);
+  renderItems(); renderExtras(); updRecCalc();
+  if (!id) $("#r-nombre").focus();
+}
+function ingOptions(sel) {
+  const list = Object.entries(S.ing).sort(sortByName);
+  return `<option value="">Elegí un ingrediente…</option>` + list.map(([id, i]) => `<option value="${id}" ${id === sel ? "selected" : ""}>${esc(i.nombre)}</option>`).join("");
+}
+function renderItems() {
+  const el = $("#r-items"); if (!el) return;
+  el.innerHTML = `<table><thead><tr><th>Ingrediente</th><th style="width:110px">Cantidad</th><th style="width:150px">Unidad</th><th class="r" style="width:120px">Costo</th><th style="width:40px"></th></tr></thead><tbody>
+  ${recDraft.items.map((it, k) => { const c = itemCalc(it, id => S.ing[id]); return `<tr>
+    <td><select class="in" data-item="${k}" data-f="ingId" aria-label="Ingrediente">${ingOptions(it.ingId)}</select>${c.err && it.ingId ? `<div class="sub" style="color:var(--bad)">${esc(c.err)}</div>` : c.warn ? `<div class="sub" style="color:var(--warn)">Este ingrediente no tiene precio</div>` : ""}</td>
+    <td><input class="in num" data-item="${k}" data-f="cantidad" inputmode="decimal" value="${it.cantidad === "" ? "" : esc(fmtNum(parseNum(it.cantidad), 3))}" aria-label="Cantidad"></td>
+    <td><select class="in" data-item="${k}" data-f="unidad" aria-label="Unidad">${USE_UNITS.map(u => `<option value="${u}" ${u === it.unidad ? "selected" : ""}>${UNITS[u].label}</option>`).join("")}</select></td>
+    <td class="r num" id="ic-${k}">${it.ingId && parseNum(it.cantidad) > 0 && !c.err ? fmtMoney(c.cost) : "—"}</td>
+    <td><button type="button" class="btn sm ghost" data-act="rm-item" data-k="${k}" aria-label="Quitar">✕</button></td></tr>`; }).join("")}
+  </tbody></table>`;
+}
+function renderExtras() {
+  const el = $("#r-extras"); if (!el) return;
+  el.innerHTML = (recDraft.extras || []).map((e, k) => `<div class="row" style="margin-bottom:6px"><input class="in" style="flex:1;min-width:140px" data-extra="${k}" data-f="nombre" value="${esc(e.nombre)}" placeholder="ej. Cajas y etiquetas" aria-label="Concepto"><input class="in num" style="width:120px" data-extra="${k}" data-f="monto" inputmode="decimal" value="${e.monto === "" ? "" : esc(fmtNum(parseNum(e.monto)))}" placeholder="$ por tanda" aria-label="Monto"><button type="button" class="btn sm ghost" data-act="rm-extra" data-k="${k}" aria-label="Quitar">✕</button></div>`).join("");
+}
+function readRecHead() {
+  recDraft.nombre = $("#r-nombre").value.trim(); recDraft.categoria = $("#r-cat").value.trim();
+  recDraft.rinde = parseNum($("#r-rinde").value) || 1; recDraft.unidadRinde = $("#r-urinde").value.trim();
+  const m = $("#r-margen").value.trim(); recDraft.margen = m === "" ? "" : parseNum(m); recDraft.notas = $("#r-notas").value; recDraft.sinGastos = !$("#r-gastos").checked;
+}
+function updRecCalc() {
+  const el = $("#r-calc"); if (!el) return; readRecHead();
+  const c = recCalc(recDraft);
+  recDraft.items.forEach((it, k) => { const cell = $("#ic-" + k); if (cell) { const x = itemCalc(it, id => S.ing[id]); cell.textContent = it.ingId && parseNum(it.cantidad) > 0 && !x.err ? fmtMoney(x.cost) : "—"; } });
+  el.innerHTML = `<div><div class="k">Costo de la receta</div><div class="v num">${fmtMoney(c.total)}</div></div>
+    <div><div class="k">Costo por unidad</div><div class="v num">${fmtMoney(c.costoU)}</div>${c.gastoU ? `<div class="note">${fmtMoney(c.costoReceta)} receta + ${fmtMoney(c.gastoU)} local</div>` : ""}</div>
+    <div><div class="k">Precio sin IVA</div><div class="v num">${fmtMoney(c.precioSinIva)}</div>${c.iva ? `<div class="note">IVA ${fmtNum(c.iva)}%: ${fmtMoney(c.ivaMonto)}</div>` : ""}</div>
+    <div><div class="k">Precio final</div><div class="v big num">${fmtMoney(c.precio)}</div></div>
+    <div><div class="k">Ganás por unidad</div><div class="v num">${fmtMoney(c.ganancia)}</div></div>
+    ${c.issues.filter(i => i.t !== "Sin ingredientes").length ? `<div style="grid-column:1/-1" class="warnbox">${esc([...new Set(c.issues.map(i => i.t))].join(" · "))}</div>` : ""}`;
+}
+
+/* ---------- Importar desde Word ---------- */
+function viewImportar() {
+  return `<div><h2>Importar recetas desde Word</h2><p class="lead">Subí un archivo .docx con una o varias recetas. Cada receta necesita un título y debajo los ingredientes con su cantidad, por ejemplo «250 g harina de arroz» o «3 huevos». Después revisás todo antes de guardar.</p></div>
+  ${ui.drafts ? viewDrafts() : `
+  <div class="cols">
+    <label class="drop" id="drop"><span class="big">Arrastrá tu archivo de Word acá</span><span class="note">o tocá para elegirlo (.docx)</span><input type="file" id="docx" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden></label>
+    <div class="panel" style="padding:14px;display:flex;flex-direction:column;gap:8px"><label class="f" for="paste">También podés pegar el texto de la receta</label>
+      <textarea class="in" id="paste" rows="7" placeholder="Budín de limón&#10;Rinde: 1 budín&#10;Ingredientes&#10;200 g harina de arroz&#10;100 g fécula de mandioca&#10;3 huevos&#10;150 g azúcar"></textarea>
+      <div class="row"><span class="spacer"></span><button class="btn pri" data-act="parse-paste">Leer receta</button></div></div>
+  </div>
+  ${ui.importMsg ? `<div class="warnbox">${esc(ui.importMsg)}</div>` : ""}`}`;
+}
+function viewDrafts() {
+  const d = ui.drafts;
+  const ingList = Object.entries(S.ing).sort(sortByName);
+  const newNames = new Set(); d.forEach(r => r.items.forEach(it => { if (it.match === "__new") newNames.add(norm(it.nombre)); }));
+  return `<div class="okbox">Encontré ${d.length} receta${d.length > 1 ? "s" : ""}. Revisá que cada línea apunte al ingrediente correcto. Lo que no exista se crea nuevo, sin precio, y después lo completás.</div>
+  ${d.map((r, k) => `<div class="panel" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div class="row"><label class="row" style="gap:6px"><input type="checkbox" data-draft="${k}" data-f="incluir" ${r.incluir ? "checked" : ""}> Importar</label>
+      <input class="in" style="flex:1;min-width:180px;font-weight:700" data-draft="${k}" data-f="nombre" value="${esc(r.nombre)}" aria-label="Nombre">
+      <label class="row" style="gap:6px">Rinde <input class="in num" style="width:80px" data-draft="${k}" data-f="rinde" value="${esc(fmtNum(r.rinde))}" aria-label="Rinde"></label>
+      ${S.rec[r.existing] ? `<span class="pill warn">Ya existe, se reemplaza</span>` : ""}</div>
+    <div class="tbl-wrap items"><table style="min-width:620px"><thead><tr><th>Línea del Word</th><th style="width:100px">Cantidad</th><th style="width:150px">Unidad</th><th>Ingrediente del panel</th></tr></thead><tbody>
+    ${r.items.map((it, j) => `<tr><td class="orig">${esc(it.linea)}</td>
+      <td><input class="in num" data-di="${k}:${j}" data-f="cantidad" value="${esc(fmtNum(it.cantidad, 3))}" aria-label="Cantidad"></td>
+      <td><select class="in" data-di="${k}:${j}" data-f="unidad" aria-label="Unidad">${USE_UNITS.map(u => `<option value="${u}" ${u === it.unidad ? "selected" : ""}>${UNITS[u].label}</option>`).join("")}</select></td>
+      <td><select class="in" data-di="${k}:${j}" data-f="match" aria-label="Ingrediente">
+        <option value="__new" ${it.match === "__new" ? "selected" : ""}>Crear nuevo: ${esc(it.nombre)}</option>
+        <option value="__skip" ${it.match === "__skip" ? "selected" : ""}>No incluir esta línea</option>
+        <optgroup label="Ingredientes existentes">${ingList.map(([id, i]) => `<option value="${id}" ${it.match === id ? "selected" : ""}>${esc(i.nombre)}</option>`).join("")}</optgroup></select></td></tr>`).join("")}
+    </tbody></table></div>
+    ${r.notas ? `<details><summary class="note">Preparación (${r.notas.split("\n").length} líneas)</summary><p class="note" style="white-space:pre-wrap">${esc(r.notas)}</p></details>` : ""}
+  </div>`).join("")}
+  <div class="row"><button class="btn" data-act="import-cancel">Cancelar</button><span class="spacer"></span><span class="note">${newNames.size ? `Se van a crear ${newNames.size} ingrediente${newNames.size > 1 ? "s" : ""} nuevo${newNames.size > 1 ? "s" : ""}.` : ""}</span><button class="btn pri" data-act="import-save">Guardar ${d.filter(r => r.incluir).length} receta${d.filter(r => r.incluir).length === 1 ? "" : "s"}</button></div>`;
+}
+
+// Lector de .docx sin librerías: un .docx es un zip; se extrae word/document.xml.
+async function docxLines(file) {
+  const buf = await file.arrayBuffer(); const dv = new DataView(buf); const u8 = new Uint8Array(buf);
+  let eocd = -1; for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("zip");
+  const n = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true); let xml = null;
+  for (let e = 0; e < n; e++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nl));
+    if (name === "word/document.xml") {
+      const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true);
+      const data = u8.slice(start, start + csize);
+      xml = method === 0 ? new TextDecoder().decode(data) : await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+      break;
+    }
+    p += 46 + nl + xl + cl;
+  }
+  if (!xml) throw new Error("doc");
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const x = new DOMParser().parseFromString(xml, "application/xml");
+  const body = x.getElementsByTagNameNS(W, "body")[0]; const out = [];
+  const pText = pe => { let t = ""; pe.querySelectorAll("*").forEach(n => { if (n.namespaceURI !== W) return; if (n.localName === "t") t += n.textContent; else if (n.localName === "tab") t += " "; else if (n.localName === "br") t += "\n"; }); return t; };
+  const isHead = pe => { const st = pe.getElementsByTagNameNS(W, "pStyle")[0]; if (st && /heading|t[ií]tulo|title|encabezado/i.test(st.getAttributeNS(W, "val") || st.getAttribute("w:val") || "")) return true;
+    const runs = [...pe.getElementsByTagNameNS(W, "r")].filter(r => r.getElementsByTagNameNS(W, "t").length && r.textContent.trim());
+    return runs.length > 0 && runs.every(r => { const b = r.getElementsByTagNameNS(W, "b")[0]; return b && !/^(0|false)$/.test(b.getAttributeNS(W, "val") || b.getAttribute("w:val") || ""); }); };
+  const walk = el => { for (const c of el.children) {
+    if (c.namespaceURI === W && c.localName === "p") { const h = isHead(c); pText(c).split("\n").forEach(t => out.push({ t, h })); }
+    else if (c.namespaceURI === W && c.localName === "tbl") { for (const tr of c.getElementsByTagNameNS(W, "tr")) { const cells = [...tr.getElementsByTagNameNS(W, "tc")].map(tc => [...tc.getElementsByTagNameNS(W, "p")].map(pText).join(" ").trim()).filter(Boolean); out.push({ t: cells.join(" "), h: false }); } }
+    else if (c.children && c.children.length) walk(c); } };
+  walk(body || x.documentElement);
+  return out;
+}
+
+/* Lectura de líneas de receta */
+const UNIT_RX = "kilos?|kilogramos?|kgs?|gramos?|grs?|g|litros?|lts?|lt|l|mililitros?|ml|cc|cm3|unidades?|unid|un|u|docenas?|cucharadas?|cdas?|cucharaditas?|cdtas?|tazas?|pizcas?|sobres?|paquetes?|planchas?|cajas?|latas?|potes?|frascos?";
+const QTY_RX = "\\d+(?:[.,]\\d+)?(?:\\s+\\d+\\/\\d+)?|\\d+\\/\\d+|[½¼¾⅓⅔]";
+const RX_A = new RegExp(`^(${QTY_RX})\\s*(${UNIT_RX})?\\.?(?=\\s|$)\\s*(?:de\\s+)?(.+)$`, "i");
+const RX_B = new RegExp(`^(.+?)[\\s:.\\-–]+(${QTY_RX})\\s*(${UNIT_RX})?\\.?$`, "i");
+function qtyVal(s) {
+  s = s.trim(); const fr = { "½": .5, "¼": .25, "¾": .75, "⅓": 1 / 3, "⅔": 2 / 3 }; if (fr[s]) return fr[s];
+  const m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/); if (m) return +m[1] + m[2] / m[3];
+  const f = s.match(/^(\d+)\/(\d+)$/); if (f) return f[1] / f[2];
+  return parseNum(s);
+}
+function unitKey(u) {
+  u = norm(u || "");
+  if (!u) return { u: "u", f: 1 };
+  if (/^(kilos?|kilogramos?|kgs?)$/.test(u)) return { u: "kg", f: 1 };
+  if (/^(gramos?|grs?|g)$/.test(u)) return { u: "g", f: 1 };
+  if (/^(litros?|lts?|lt|l)$/.test(u)) return { u: "l", f: 1 };
+  if (/^(mililitros?|ml|cc|cm3)$/.test(u)) return { u: "ml", f: 1 };
+  if (/^(docenas?)$/.test(u)) return { u: "u", f: 12 };
+  if (/^(cucharaditas?|cdtas?)$/.test(u)) return { u: "cdta", f: 1 };
+  if (/^(cucharadas?|cdas?)$/.test(u)) return { u: "cda", f: 1 };
+  if (/^(tazas?)$/.test(u)) return { u: "taza", f: 1 };
+  if (/^(pizcas?)$/.test(u)) return { u: "g", f: 0, pizca: true };
+  return { u: "u", f: 1 };
+}
+function parseIngLine(line) {
+  let s = line.replace(/^[\s\-•*·–—►✓✔▪◦○●]+/, "").replace(/\s+/g, " ").trim();
+  if (!s || s.length > 90) return null;
+  if (/\b(c\/n|cantidad necesaria|a gusto|c\.n\.)\b/i.test(s)) return { nombre: cleanName(s.replace(/\b(c\/n|cantidad necesaria|a gusto|c\.n\.)\b/ig, "")), cantidad: 0, unidad: "g", linea: line.trim(), skip: true };
+  let m = s.match(RX_A), q, u, name;
+  if (m) { q = m[1]; u = m[2]; name = m[3]; }
+  else { m = s.match(RX_B); if (!m) return null; name = m[1]; q = m[2]; u = m[3]; }
+  if (/^(minutos?|min|horas?|hs|grados?|°)/i.test(name)) return null;
+  const uk = unitKey(u); let qty = qtyVal(q) * (uk.f || 1);
+  if (!isFinite(qty)) return null;
+  return { nombre: cleanName(name), cantidad: uk.pizca ? 0 : qty, unidad: uk.u, linea: line.trim(), skip: !!uk.pizca };
+}
+function cleanName(n) { return n.replace(/\(.*?\)/g, "").split(/,| - /)[0].replace(/^(de|del)\s+/i, "").replace(/[.:;]+$/, "").trim().replace(/^./, c => c.toUpperCase()); }
+const HEAD_ING = /^(ingredientes?|para (el|la|los|las) \S+|masa|relleno|cobertura|ba[ñn]o|decoraci[oó]n|alm[ií]bar|glas[eé])\b.{0,30}$/i;
+const HEAD_PREP = /^(preparaci[oó]n|procedimiento|elaboraci[oó]n|pasos|modo de preparaci[oó]n|instrucciones)\s*:?$/i;
+function parseRecipes(lines) {
+  const L = lines.map(l => typeof l === "string" ? { t: l, h: false } : l).map(l => ({ t: l.t.trim(), h: l.h })).filter(l => l.t);
+  const recs = []; let cur = null, mode = "start";
+  const nextIsIng = i => { const n = L[i + 1]; return !!n && (HEAD_ING.test(n.t) || !!parseIngLine(n.t) || /rinde|rendimiento|porciones/i.test(n.t)); };
+  const isTitle = i => { const t = L[i].t; return !parseIngLine(t) && !HEAD_ING.test(t) && !HEAD_PREP.test(t) && t.length <= 70 && !/[.:]$/.test(t) && (L[i].h || nextIsIng(i)); };
+  const start = name => { cur = { nombre: name.replace(/^receta( de)?:?\s*/i, "").replace(/^./, c => c.toUpperCase()), rinde: 1, items: [], notas: "" }; recs.push(cur); mode = "ing"; };
+  L.forEach((l, i) => {
+    const t = l.t;
+    const rm = t.match(/(?:rinde|rendimiento|porciones)\s*:?\s*(?:aprox\.?\s*)?(\d+(?:[.,]\d+)?)/i);
+    if (rm) { if (!cur) start("Receta importada"); cur.rinde = parseNum(rm[1]) || 1; return; }
+    if (HEAD_PREP.test(t)) { if (cur) mode = "prep"; return; }
+    if (isTitle(i) && (mode !== "ing" || (cur && cur.items.length))) { start(t); return; }
+    if (HEAD_ING.test(t)) { if (!cur) start("Receta importada"); mode = "ing"; return; }
+    if (mode !== "prep") { const ing = parseIngLine(t); if (ing) { if (!cur) start("Receta importada"); cur.items.push(ing); return; } }
+    if (!cur) { if (t.length <= 70) start(t); return; }
+    cur.notas += t + "\n";
+  });
+  return recs.filter(r => r.items.length).map(r => ({ ...r, notas: r.notas.trim() }));
+}
+const STOP = new Set(["de", "del", "la", "el", "los", "las", "y", "en", "para", "con", "sin", "tacc", "al", "a"]);
+const toks = s => norm(s).split(" ").filter(w => w && !STOP.has(w)).map(w => w.length > 4 ? w.replace(/(es|s)$/, "") : w);
+function bestMatch(name) {
+  const a = toks(name); if (!a.length) return null; let best = null, bs = 0;
+  Object.entries(S.ing).forEach(([id, i]) => { const b = toks(i.nombre); if (!b.length) return; const inter = b.filter(w => a.includes(w)).length; let sc = inter / Math.max(b.length, a.length); if (norm(i.nombre) === norm(name)) sc = 2; else if (inter === b.length) sc += .3; if (sc > bs) { bs = sc; best = id; } });
+  return bs >= .5 ? best : null;
+}
+function loadDrafts(recs) {
+  if (!recs.length) { ui.importMsg = "No encontré ingredientes con cantidades. Revisá que cada línea tenga la cantidad, por ejemplo «200 g azúcar» o «Azúcar 200 g»."; ui.drafts = null; render(); return; }
+  ui.importMsg = "";
+  const byName = Object.fromEntries(Object.entries(S.rec).map(([id, r]) => [norm(r.nombre), id]));
+  ui.drafts = recs.map(r => ({ ...r, incluir: true, existing: byName[norm(r.nombre)] || null, items: r.items.map(it => ({ ...it, match: it.skip ? "__skip" : (bestMatch(it.nombre) || "__new") })) }));
+  render();
+}
+async function handleDocx(file) {
+  if (!file) return;
+  if (!/\.docx$/i.test(file.name)) { ui.importMsg = "Ese archivo no es .docx. En Word usá Archivo › Guardar como › Documento de Word (.docx) y subilo de nuevo."; render(); return; }
+  try { loadDrafts(parseRecipes(await docxLines(file))); }
+  catch (e) { ui.importMsg = "No pude leer el archivo. Probá abrirlo en Word, guardarlo de nuevo como .docx, o copiá y pegá el texto en el recuadro."; render(); }
+}
+async function saveDrafts() {
+  const now = new Date().toISOString(); const created = {}; let nR = 0, nI = 0;
+  for (const r of ui.drafts.filter(r => r.incluir)) {
+    const items = [];
+    for (const it of r.items) {
+      if (it.match === "__skip") continue;
+      let id = it.match;
+      if (id === "__new") {
+        const key = norm(it.nombre);
+        if (!created[key]) { created[key] = uid(); const dim = UNITS[it.unidad].dim; await put("ingredientes", created[key], { nombre: it.nombre, categoria: "", proveedor: "", cantidad: 1, unidad: dim === "u" ? "u" : (it.unidad === "ml" || it.unidad === "l" ? "l" : "kg"), precio: 0, creado: now }); nI++; }
+        id = created[key];
+      }
+      items.push({ ingId: id, cantidad: parseNum(it.cantidad) || 0, unidad: it.unidad });
+    }
+    const id = r.existing || uid(); const prev = S.rec[id] || {};
+    await put("recetas", id, { nombre: r.nombre, categoria: prev.categoria || "", rinde: parseNum(r.rinde) || 1, unidadRinde: prev.unidadRinde || "unidades", margen: prev.margen ?? "", items, extras: prev.extras || [], notas: r.notas || prev.notas || "", actualizado: now });
+    nR++;
+  }
+  ui.drafts = null;
+  if (nI) { ui.tab = "ingredientes"; ui.catIng = "__sin"; }
+  else ui.tab = "productos";
+  render();
+  toast(`Guardé ${nR} receta${nR !== 1 ? "s" : ""}${nI ? `. Cargá el precio de los ${nI} ingrediente${nI > 1 ? "s" : ""} nuevo${nI > 1 ? "s" : ""}` : ""}.`);
+}
+
+/* ---------- Historial ---------- */
+function viewHistorial() {
+  if (!S.hist.length) return `<div><h2>Historial de precios</h2></div><div class="panel empty"><p>Cada vez que cambies el precio de un ingrediente queda registrado acá, con la fecha y cuánto aumentó.</p></div>`;
+  return `<div><h2>Historial de precios</h2><p class="lead">Los cambios más recientes primero.</p></div>
+  <div class="panel tbl-wrap"><table style="min-width:520px"><thead><tr><th>Fecha</th><th>Ingrediente</th><th class="r">Antes</th><th class="r">Después</th><th class="r">Cambio</th></tr></thead><tbody>
+  ${S.hist.map(h => h.cambios.map((c, k) => { const p = c.antes ? (c.despues - c.antes) / c.antes * 100 : 0; return `<tr><td class="num">${k === 0 ? `${fmtDate(h.fecha)} <span class="sub">${fmtTime(h.fecha)}</span>${h.cambios.length > 1 ? ` <span class="pill neu">${h.cambios.length} juntos</span>` : ""}` : ""}</td><td class="name">${esc(S.ing[c.ingId]?.nombre || c.nombre)}</td><td class="r num">${fmtMoney(c.antes)}</td><td class="r num">${fmtMoney(c.despues)}</td><td class="r num ${p > 0 ? "up" : p < 0 ? "down" : ""}">${c.antes ? fmtPct(p) : "primer precio"}</td></tr>`; }).join("")).join("")}
+  </tbody></table></div>`;
+}
+
+/* ---------- Ajustes ---------- */
+function viewAjustes() {
+  const hasEj = Object.values(S.ing).some(i => i.ejemplo) || Object.values(S.rec).some(r => r.ejemplo);
+  return `<div><h2>Ajustes</h2></div>
+  <div class="panel" style="padding:18px;display:flex;flex-direction:column;gap:14px">
+    <h3>Precios</h3>
+    <div class="grid">
+      <label class="f">Margen de ganancia general %<input class="in num" id="cfg-margen" inputmode="decimal" value="${esc(fmtNum(parseNum(S.cfg.margen)))}"></label>
+      <label class="f">Redondear precios hacia arriba a<select class="in" id="cfg-red">${[0, 10, 50, 100, 500].map(v => `<option value="${v}" ${parseNum(S.cfg.redondeo) === v ? "selected" : ""}>${v ? "$ " + v : "Sin redondeo"}</option>`).join("")}</select></label>
+      <label class="f">IVA %<input class="in num" id="cfg-iva" inputmode="decimal" value="${esc(fmtNum(parseNum(S.cfg.iva) || 0))}"></label>
+      <label class="f">Símbolo de moneda<input class="in" id="cfg-mon" value="${esc(S.cfg.moneda)}" maxlength="4"></label>
+    </div>
+    <p class="note" style="margin:0">El margen general se usa en las recetas que no tienen uno propio. Con 120% de margen y 21% de IVA, un producto que cuesta $ 1.000 queda en $ 2.200 + IVA = $ 2.662. Si no cobrás IVA (por ejemplo, si sos monotributista), poné 0.</p>
+  </div>
+  <div class="panel" style="padding:18px;display:flex;flex-direction:column;gap:12px">
+    <h3>Gastos del local</h3>
+    <p class="note" style="margin:0">Alquiler, luz, gas, sueldos, monotributo: lo que pagás por mes aunque no hornees. Se reparte entre las unidades que producís en el mes y se suma al costo de cada producto.</p>
+    <div id="gastos-list" class="items">${(S.cfg.gastos || []).map((g, k) => `<div class="row" style="margin-bottom:6px"><input class="in" style="flex:1;min-width:140px" data-gasto="${k}" data-f="nombre" value="${esc(g.nombre)}" placeholder="ej. Alquiler" aria-label="Gasto"><input class="in num" style="width:130px" data-gasto="${k}" data-f="monto" inputmode="decimal" value="${g.monto === "" ? "" : esc(fmtNum(parseNum(g.monto)))}" placeholder="$ por mes" aria-label="Monto mensual"><button type="button" class="btn sm ghost" data-act="rm-gasto" data-k="${k}" aria-label="Quitar">✕</button></div>`).join("")}</div>
+    <div class="row"><button type="button" class="btn sm" data-act="add-gasto">+ Agregar gasto</button></div>
+    <div class="grid">
+      <label class="f">Unidades que producís por mes (aprox.)<input class="in num" id="cfg-umes" inputmode="decimal" value="${parseNum(S.cfg.unidadesMes) > 0 ? esc(fmtNum(parseNum(S.cfg.unidadesMes))) : ""}" placeholder="ej. 1500"></label>
+    </div>
+    <div class="calc" id="gastos-calc"></div>
+    <div class="row"><span class="spacer"></span><button class="btn pri" data-act="save-cfg">Guardar ajustes</button></div>
+  </div>
+  <div class="panel" style="padding:18px;display:flex;flex-direction:column;gap:10px">
+    <h3>Copia de seguridad</h3>
+    <p class="note" style="margin:0">${S.mode === "db" ? "Tus datos se guardan en la nube y los ves desde cualquier dispositivo con tu cuenta." : "Tus datos se guardan en este navegador. Copiá el respaldo de vez en cuando y guardalo en un documento."} Para pasar datos de un lado a otro, copiá el respaldo y pegalo en el otro panel.</p>
+    <div class="row"><button class="btn" data-act="backup">Mostrar respaldo para copiar</button><button class="btn" data-act="restore">Restaurar desde un respaldo</button>${hasEj ? `<span class="spacer"></span><span id="ej-zone"><button class="btn danger" data-act="ask-del-ej">Borrar datos de ejemplo</button></span>` : ""}</div>
+    <div id="backup-slot"></div>
+  </div>`;
+}
+
+function readGastos() { ui.gastos = [...document.querySelectorAll("[data-gasto][data-f=nombre]")].map(el => ({ nombre: el.value.trim(), monto: document.querySelector(`[data-gasto="${el.dataset.gasto}"][data-f=monto]`).value })); }
+function updGastosCalc() {
+  const el = $("#gastos-calc"); if (!el) return; readGastos();
+  const tot = ui.gastos.reduce((a, g) => a + (parseNum(g.monto) || 0), 0); const u = parseNum($("#cfg-umes").value);
+  el.innerHTML = `<div><div class="k">Gastos por mes</div><div class="v num">${fmtMoney(tot)}</div></div><div><div class="k">Se suma a cada unidad</div><div class="v big num">${u > 0 && tot ? fmtMoney(tot / u) : "—"}</div>${!(u > 0) && tot ? `<div class="note">Completá las unidades por mes</div>` : ""}</div>`;
+}
+
+/* ====================== Modal y avisos ====================== */
+function modal(html) { $("#modal").innerHTML = html ? `<div class="ov" data-act="ov"><div class="md" role="dialog" aria-modal="true">${html}</div></div>` : ""; }
+function closeModal() { modal(""); recDraft = null; ingDraft = null; ui.preview = null; render(); }
+let toastT;
+function toast(t) { $("#toast-slot").innerHTML = `<div class="toast" role="status">${esc(t)}</div>`; clearTimeout(toastT); toastT = setTimeout(() => $("#toast-slot").innerHTML = "", 4200); }
+function setTab(k) { ui.tab = k; try { localStorage.setItem("chialli-tab", k); } catch {} render(); window.scrollTo({ top: 0 }); }
+
+/* ====================== Ejemplos ====================== */
+async function seed() {
+  const now = new Date().toISOString();
+  const I = [
+    ["Harina de arroz", "Harinas", 1, "kg", 2400], ["Fécula de mandioca", "Harinas", 1, "kg", 2100], ["Almidón de maíz", "Harinas", 1, "kg", 1900],
+    ["Azúcar", "Secos", 1, "kg", 1300], ["Polvo de hornear sin TACC", "Secos", 50, "g", 650], ["Goma xántica", "Secos", 100, "g", 3500],
+    ["Manteca", "Frescos", 200, "g", 2600], ["Huevos", "Frescos", 30, "u", 7500], ["Leche", "Frescos", 1, "l", 1400],
+    ["Dulce de leche repostero", "Rellenos", 1, "kg", 5200], ["Coco rallado", "Rellenos", 500, "g", 3800], ["Esencia de vainilla", "Secos", 100, "ml", 1500], ["Bolsas celofán", "Packaging", 100, "u", 4000],
+  ];
+  const ids = {};
+  for (const [nombre, categoria, cantidad, unidad, precio] of I) { const id = uid(); ids[nombre] = id; await put("ingredientes", id, { nombre, categoria, proveedor: "", cantidad, unidad, precio, ejemplo: true, creado: now }); }
+  const R = [
+    ["Alfajores de maicena", "Alfajores", 24, "unidades", 120, [["Almidón de maíz", 300, "g"], ["Harina de arroz", 200, "g"], ["Manteca", 200, "g"], ["Azúcar", 150, "g"], ["Huevos", 3, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Esencia de vainilla", 5, "ml"], ["Dulce de leche repostero", 500, "g"], ["Coco rallado", 50, "g"], ["Bolsas celofán", 24, "u"]]],
+    ["Budín de vainilla", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Leche", 120, "ml"], ["Manteca", 100, "g"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"], ["Esencia de vainilla", 5, "ml"]]],
+  ];
+  for (const [nombre, categoria, rinde, unidadRinde, margen, items] of R)
+    await put("recetas", uid(), { nombre, categoria, rinde, unidadRinde, margen, items: items.map(([n, c, u]) => ({ ingId: ids[n], cantidad: c, unidad: u })), extras: nombre.startsWith("Budín") ? [{ nombre: "Molde descartable y etiqueta", monto: 450 }] : [], notas: "", ejemplo: true });
+  render(); toast("Cargué 13 ingredientes y 2 recetas de ejemplo. Los precios son de muestra.");
+}
+
+/* ====================== Eventos ====================== */
+document.addEventListener("click", async e => {
+  const t = e.target.closest("[data-act]"); if (!t) return;
+  const a = t.dataset.act, id = t.dataset.id;
+  if (a === "ov") { if (e.target === t) closeModal(); return; }
+  if (t.tagName === "INPUT" && a !== "sel") return;
+  switch (a) {
+    case "tab": setTab(t.dataset.k); break;
+    case "close": closeModal(); break;
+    case "seed": t.disabled = true; await seed(); break;
+    case "new-ing": openIng(null); break;
+    case "edit-ing": openIng(id); break;
+    case "new-rec": openRec(null); break;
+    case "edit-rec": openRec(id); break;
+    case "sel": if (t.checked) ui.sel.add(id); else ui.sel.delete(id); t.closest("tr").classList.toggle("sel", t.checked); renderBulk(); { const sa = $("#sel-all"); if (sa) { const vis = visibleIngs().map(r => r[0]); sa.checked = vis.every(x => ui.sel.has(x)); sa.indeterminate = !sa.checked && vis.some(x => ui.sel.has(x)); } } break;
+    case "bulk-mode": ui.bulkMode = t.dataset.k; renderBulk(); $("#bulk-val")?.focus(); break;
+    case "bulk-clear": ui.sel.clear(); renderIngRows(); break;
+    case "bulk-preview": {
+      const v = parseNum($("#bulk-val").value); ui.bulkVal = $("#bulk-val").value;
+      if (!isFinite(v) || v === 0) { toast(ui.bulkMode === "pct" ? "Escribí el porcentaje de aumento, por ejemplo 15." : "Escribí el monto a sumar, por ejemplo 500."); $("#bulk-val").focus(); break; }
+      const np = {}; ui.sel.forEach(id => { const o = parseNum(S.ing[id].precio) || 0; np[id] = Math.max(0, ui.bulkMode === "pct" ? o * (1 + v / 100) : o + v); });
+      openPreview(np, ui.bulkMode === "pct" ? `Aumento de ${fmtNum(v)}% en ${ui.sel.size} ingrediente${ui.sel.size > 1 ? "s" : ""}` : `Sumar ${fmtMoney(v)} a ${ui.sel.size} ingrediente${ui.sel.size > 1 ? "s" : ""}`); break; }
+    case "apply-preview": { const np = ui.preview.newPrices; t.disabled = true; modal(""); ui.preview = null; await applyPrices(np); ui.sel.clear(); ui.bulkVal = ""; render(); break; }
+    case "ask-del-ing": $("#del-zone").innerHTML = `<span class="note">¿Borrar? </span><button type="button" class="btn danger" data-act="del-ing">Sí, borrar</button>`; break;
+    case "del-ing": { const used = recipesUsing(new Set([ingDraft.id])); await del("ingredientes", ingDraft.id); closeModal(); toast(used.length ? `Borrado. Revisá ${used.length} receta${used.length > 1 ? "s" : ""} que lo usaba${used.length > 1 ? "n" : ""}.` : "Ingrediente borrado."); break; }
+    case "ask-del-rec": $("#del-zone").innerHTML = `<span class="note">¿Borrar? </span><button type="button" class="btn danger" data-act="del-rec">Sí, borrar</button>`; break;
+    case "del-rec": await del("recetas", recDraft.id); closeModal(); toast("Receta borrada."); break;
+    case "dup-rec": { readRecHead(); const copy = { ...recDraft, nombre: recDraft.nombre + " (copia)" }; delete copy.id; openRec(null, copy); break; }
+    case "add-item": readRecHead(); recDraft.items.push({ ingId: "", cantidad: "", unidad: "g" }); renderItems(); updRecCalc(); break;
+    case "rm-item": recDraft.items.splice(+t.dataset.k, 1); renderItems(); updRecCalc(); break;
+    case "add-extra": (recDraft.extras ||= []).push({ nombre: "", monto: "" }); renderExtras(); break;
+    case "rm-extra": recDraft.extras.splice(+t.dataset.k, 1); renderExtras(); updRecCalc(); break;
+    case "new-ing-inline": { const wrap = t.parentElement; if ($("#quick-ing")) break; wrap.insertAdjacentHTML("afterend", `<div class="row" id="quick-ing" style="margin-top:8px;background:var(--cream);padding:10px;border-radius:8px"><input class="in" id="q-n" placeholder="Nombre" style="flex:1;min-width:140px"><input class="in num" id="q-c" placeholder="Cantidad" value="1" style="width:80px"><select class="in" id="q-u">${BUY_UNITS.map(u => `<option value="${u}">${UNITS[u].label}</option>`).join("")}</select><input class="in num" id="q-p" placeholder="Precio" style="width:100px"><button type="button" class="btn sm pri" data-act="quick-ing-save">Crear</button></div>`); $("#q-n").focus(); break; }
+    case "quick-ing-save": { const n = $("#q-n").value.trim(); if (!n) { $("#q-n").focus(); break; } const nid = uid(); await put("ingredientes", nid, { nombre: n, categoria: "", proveedor: "", cantidad: parseNum($("#q-c").value) || 1, unidad: $("#q-u").value, precio: parseNum($("#q-p").value) || 0, creado: new Date().toISOString() }); readRecHead(); const empty = recDraft.items.find(i => !i.ingId); if (empty) empty.ingId = nid; else recDraft.items.push({ ingId: nid, cantidad: "", unidad: UNITS[$("#q-u").value].dim === "u" ? "u" : "g" }); $("#quick-ing").remove(); renderItems(); updRecCalc(); toast(`Creé «${n}».`); break; }
+    case "parse-paste": { const txt = $("#paste").value; if (!txt.trim()) { $("#paste").focus(); break; } loadDrafts(parseRecipes(txt.split(/\r?\n/))); break; }
+    case "import-cancel": ui.drafts = null; render(); break;
+    case "import-save": t.disabled = true; await saveDrafts(); break;
+    case "add-gasto": readGastos(); ui.gastos.push({ nombre: "", monto: "" }); S.cfg = { ...S.cfg, gastos: ui.gastos }; render(); [...document.querySelectorAll('[data-gasto][data-f="nombre"]')].pop()?.focus(); break;
+    case "rm-gasto": readGastos(); ui.gastos.splice(+t.dataset.k, 1); S.cfg = { ...S.cfg, gastos: ui.gastos }; render(); break;
+    case "save-cfg": readGastos(); await saveCfg({ margen: parseNum($("#cfg-margen").value) || 0, redondeo: parseNum($("#cfg-red").value) || 0, iva: Math.max(0, parseNum($("#cfg-iva").value) || 0), moneda: $("#cfg-mon").value.trim() || "$", gastos: ui.gastos.filter(g => g.nombre || parseNum(g.monto)).map(g => ({ nombre: g.nombre, monto: parseNum(g.monto) || 0 })), unidadesMes: parseNum($("#cfg-umes").value) || "" }); toast("Ajustes guardados. Los precios ya están recalculados."); break;
+    case "backup": { const data = JSON.stringify({ app: "chialli", version: 1, fecha: new Date().toISOString(), ingredientes: S.ing, recetas: S.rec, config: S.cfg }); $("#backup-slot").innerHTML = `<textarea class="in" id="bk" rows="5" readonly style="width:100%;font-size:.8rem">${esc(data)}</textarea><div class="row"><button class="btn sm" data-act="copy-bk">Copiar</button></div>`; break; }
+    case "copy-bk": { const ta = $("#bk"); try { await navigator.clipboard.writeText(ta.value); toast("Respaldo copiado."); } catch { ta.select(); toast("Seleccioné el texto. Copialo con Ctrl+C o mantené apretado."); } break; }
+    case "restore": $("#backup-slot").innerHTML = `<textarea class="in" id="rs" rows="5" style="width:100%;font-size:.8rem" placeholder="Pegá acá el respaldo"></textarea><div class="row"><span class="note">Los datos con el mismo nombre se reemplazan.</span><span class="spacer"></span><button class="btn sm pri" data-act="do-restore">Restaurar</button></div>`; $("#rs").focus(); break;
+    case "do-restore": { let d; try { d = JSON.parse($("#rs").value); } catch { toast("Ese texto no es un respaldo válido."); break; } if (d.app !== "chialli") { toast("Ese texto no es un respaldo de este panel."); break; } t.disabled = true; for (const [k, v] of Object.entries(d.ingredientes || {})) await put("ingredientes", k, v); for (const [k, v] of Object.entries(d.recetas || {})) await put("recetas", k, v); if (d.config) await saveCfg(d.config); render(); toast("Respaldo restaurado."); break; }
+    case "ask-del-ej": $("#ej-zone").innerHTML = `<span class="note">¿Borrar ejemplos? </span><button class="btn danger" data-act="del-ej">Sí, borrar</button>`; break;
+    case "del-ej": { t.disabled = true; for (const [k, r] of Object.entries(S.rec)) if (r.ejemplo) await del("recetas", k); for (const [k, i] of Object.entries(S.ing)) if (i.ejemplo) await del("ingredientes", k); render(); toast("Borré los datos de ejemplo."); break; }
+  }
+});
+document.addEventListener("input", e => {
+  const t = e.target;
+  if (t.id === "q-rec") { ui.qRec = t.value; renderRecRows(); }
+  else if (t.id === "q-ing") { ui.qIng = t.value; renderIngRows(); }
+  else if (t.id === "bulk-val") ui.bulkVal = t.value;
+  else if (t.dataset.item != null) { const it = recDraft.items[+t.dataset.item]; it[t.dataset.f] = t.dataset.f === "cantidad" ? t.value : t.value; updRecCalc(); }
+  else if (t.dataset.extra != null) { recDraft.extras[+t.dataset.extra][t.dataset.f] = t.value; updRecCalc(); }
+  else if (t.closest("#rec-form")) updRecCalc();
+  else if (t.dataset.gasto != null || t.id === "cfg-umes") updGastosCalc();
+  else if (t.closest("#ing-form")) updIngCalc();
+  else if (t.dataset.draft != null) { const d = ui.drafts[+t.dataset.draft]; if (t.dataset.f === "nombre") d.nombre = t.value; if (t.dataset.f === "rinde") d.rinde = parseNum(t.value) || 1; }
+  else if (t.dataset.di) { const [k, j] = t.dataset.di.split(":").map(Number); if (t.dataset.f === "cantidad") ui.drafts[k].items[j].cantidad = parseNum(t.value) || 0; }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.id === "cat-rec") { ui.catRec = t.value; renderRecRows(); }
+  else if (t.id === "cat-ing") { ui.catIng = t.value; ui.sel.clear(); renderIngRows(); }
+  else if (t.id === "sel-all") { visibleIngs().forEach(([id]) => t.checked ? ui.sel.add(id) : ui.sel.delete(id)); renderIngRows(); }
+  else if (t.id === "docx") handleDocx(t.files[0]);
+  else if (t.id === "r-gastos") updRecCalc();
+  else if (t.dataset.item != null && t.tagName === "SELECT") { const it = recDraft.items[+t.dataset.item]; it[t.dataset.f] = t.value; if (t.dataset.f === "ingId" && S.ing[t.value]) { const dim = UNITS[S.ing[t.value].unidad].dim; if (UNITS[it.unidad].dim !== dim) it.unidad = dim === "u" ? "u" : "g"; } readRecHead(); renderItems(); updRecCalc(); }
+  else if (t.dataset.draft != null && t.dataset.f === "incluir") { ui.drafts[+t.dataset.draft].incluir = t.checked; render(); }
+  else if (t.dataset.di) { const [k, j] = t.dataset.di.split(":").map(Number); const it = ui.drafts[k].items[j]; if (t.dataset.f === "unidad") it.unidad = t.value; if (t.dataset.f === "match") { it.match = t.value; render(); } }
+  else if (t.dataset.act === "price") {
+    const id = t.dataset.id, i = S.ing[id]; const v = parseNum(t.value); const o = parseNum(i.precio) || 0;
+    if (t.value.trim() === "" || !isFinite(v) || v < 0 || v === o) { t.value = o > 0 ? fmtNum(o) : ""; return; }
+    const affected = recipesUsing(new Set([id])).length;
+    if (affected) { t.value = o > 0 ? fmtNum(o) : ""; openPreview({ [id]: v }, `Nuevo precio de ${i.nombre}`); }
+    else applyPrices({ [id]: v }).then(() => renderIngRows());
+  }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("#modal").innerHTML) closeModal();
+  if (e.key === "Enter" && e.target.dataset?.act === "price") e.target.blur();
+  if (e.key === "Enter" && e.target.id === "bulk-val") { e.preventDefault(); $('[data-act="bulk-preview"]')?.click(); }
+});
+document.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (e.target.id === "ing-form") {
+    const d = readIng(); if (!d.nombre) return;
+    if (!(d.cantidad > 0)) { toast("Indicá de cuánto es el paquete, por ejemplo 1 kg o 30 unidades."); return; }
+    const id = ingDraft.id || uid(); const prev = S.ing[id] || {}; const o = parseNum(prev.precio) || 0;
+    const rec = { ...prev, ...d, actualizado: new Date().toISOString() };
+    if (ingDraft.id && o !== d.precio) { await put("ingredientes", id, { ...rec, precio: o }); closeModal(); if (recipesUsing(new Set([id])).length) openPreview({ [id]: d.precio }, `Nuevo precio de ${d.nombre}`); else { await applyPrices({ [id]: d.precio }); render(); } return; }
+    await put("ingredientes", id, rec); closeModal(); toast(ingDraft?.id ? "Ingrediente guardado." : `Agregué «${d.nombre}».`);
+  }
+  if (e.target.id === "rec-form") {
+    readRecHead(); if (!recDraft.nombre) return;
+    const id = recDraft.id || uid(); const { id: _, ...data } = recDraft;
+    data.items = data.items.filter(i => i.ingId).map(i => ({ ingId: i.ingId, cantidad: parseNum(i.cantidad) || 0, unidad: i.unidad }));
+    data.extras = (data.extras || []).filter(x => x.nombre || parseNum(x.monto)).map(x => ({ nombre: x.nombre, monto: parseNum(x.monto) || 0 }));
+    data.actualizado = new Date().toISOString();
+    await put("recetas", id, data); closeModal(); toast(`Guardé «${data.nombre}». Precio de venta: ${fmtMoney(recCalc(data).precio)}.`);
+  }
+});
+// Arrastrar y soltar el Word
+document.addEventListener("dragover", e => { const d = e.target.closest?.("#drop"); if (d) { e.preventDefault(); d.classList.add("over"); } });
+document.addEventListener("dragleave", e => { const d = e.target.closest?.("#drop"); if (d) d.classList.remove("over"); });
+document.addEventListener("drop", e => { const d = e.target.closest?.("#drop"); if (d) { e.preventDefault(); d.classList.remove("over"); handleDocx(e.dataTransfer.files[0]); } });
+
+render();
+initStore();
+</script>
+</body></html>
