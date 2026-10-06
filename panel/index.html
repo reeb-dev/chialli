@@ -148,6 +148,12 @@ tr.sel td{background:color-mix(in srgb,var(--bordo) 8%,transparent)}
 @media (max-width:760px){.cols{grid-template-columns:1fr}}
 .orig{font-size:.85rem;color:var(--muted);font-style:italic}
 
+.rubro{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.prov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.prov{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0;background:var(--bg)}
+.prov:hover{border-color:var(--bordo)}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 12px;cursor:pointer;background:var(--surface)}
+.chip:has(input:checked){border-color:var(--bordo);background:color-mix(in srgb,var(--bordo) 10%,transparent)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:calc(100% - 32px)}
 .hist-day{font-family:var(--f-head);font-weight:600;padding:10px 12px;background:var(--cream)}
 @media (prefers-reduced-motion:no-preference){.toast{animation:pop .2s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
@@ -199,7 +205,7 @@ const USE_UNITS = ["g", "kg", "ml", "l", "u", "cda", "cdta", "taza"];
 const costLabel = ing => UNITS[ing.unidad]?.dim === "u" ? "por unidad" : (ing.unidad === "l" || ing.unidad === "ml" ? "por litro" : "por kg");
 
 /* ====================== Estado y guardado ====================== */
-const S = { mode: "init", ing: {}, rec: {}, hist: [], cfg: { margen: 120, redondeo: 50, moneda: "$", iva: 21, gastos: [], unidadesMes: "" } };
+const S = { mode: "init", ing: {}, rec: {}, prov: {}, hist: [], cfg: { margen: 120, redondeo: 50, moneda: "$", iva: 21, gastos: [], unidadesMes: "" } };
 const DEFAULT_CFG = { margen: 120, redondeo: 50, moneda: "$", iva: 21, gastos: [], unidadesMes: "" };
 const ui = { gastos: [], tab: "productos", qIng: "", catIng: "", sel: new Set(), bulkMode: "pct", bulkVal: "", preview: null, qRec: "", catRec: "", drafts: null, importMsg: "" };
 try { const t = localStorage.getItem("chialli-tab"); if (t) ui.tab = t; } catch {}
@@ -209,19 +215,19 @@ const LS_KEY = "chialli-panel-v1";
 function lsLoad() {
   try {
     const d = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-    if (d) { S.ing = d.ing || {}; S.rec = d.rec || {}; S.hist = d.hist || []; S.cfg = { ...DEFAULT_CFG, ...(d.cfg || {}) }; }
+    if (d) { S.ing = d.ing || {}; S.rec = d.rec || {}; S.prov = d.prov || {}; S.hist = d.hist || []; S.cfg = { ...DEFAULT_CFG, ...(d.cfg || {}) }; }
   } catch {}
 }
-function lsSave() { try { localStorage.setItem(LS_KEY, JSON.stringify({ ing: S.ing, rec: S.rec, hist: S.hist, cfg: S.cfg })); } catch {} }
+function lsSave() { try { localStorage.setItem(LS_KEY, JSON.stringify({ ing: S.ing, rec: S.rec, prov: S.prov, hist: S.hist, cfg: S.cfg })); } catch {} }
 
 async function put(col, id, data) {
-  const map = col === "ingredientes" ? S.ing : S.rec;
+  const map = col === "ingredientes" ? S.ing : col === "proveedores" ? S.prov : S.rec;
   map[id] = data;
   if (db) await db.collection(col).doc(id).set(data);
   else lsSave();
 }
 async function del(col, id) {
-  const map = col === "ingredientes" ? S.ing : S.rec;
+  const map = col === "ingredientes" ? S.ing : col === "proveedores" ? S.prov : S.rec;
   delete map[id];
   if (db) await db.collection(col).doc(id).delete();
   else lsSave();
@@ -257,6 +263,7 @@ async function initStore() {
     db = api; S.mode = "db";
     const fail = e => { if (e && e.code === "revoked") { S.mode = "readonly"; render(); } };
     db.collection("ingredientes").onSnapshot(s => { const m = {}; s.docs.forEach(d => m[d.id] = d.data()); S.ing = m; scheduleRender(); }, fail);
+    db.collection("proveedores").onSnapshot(s => { const m = {}; s.docs.forEach(d => m[d.id] = d.data()); S.prov = m; scheduleRender(); }, fail);
     db.collection("recetas").onSnapshot(s => { const m = {}; s.docs.forEach(d => m[d.id] = d.data()); S.rec = m; scheduleRender(); }, fail);
     db.collection("historial").orderBy("fecha", "desc").limit(150).onSnapshot(s => { S.hist = s.docs.map(d => ({ id: d.id, ...d.data() })); scheduleRender(); }, fail);
     db.doc("config/general").onSnapshot(s => { S.cfg = { ...DEFAULT_CFG, ...(s.exists ? s.data() : {}) }; scheduleRender(); }, fail);
@@ -316,14 +323,14 @@ const recipesUsing = ids => Object.entries(S.rec).filter(([, r]) => (r.items || 
 const sortByName = (a, b) => (a[1].nombre || "").localeCompare(b[1].nombre || "", "es");
 
 /* ====================== Render ====================== */
-const TABS = [["productos", "Productos"], ["ingredientes", "Ingredientes"], ["importar", "Importar Word"], ["historial", "Historial"], ["ajustes", "Ajustes"]];
+const TABS = [["productos", "Productos"], ["ingredientes", "Ingredientes"], ["proveedores", "Proveedores"], ["importar", "Importar Word"], ["historial", "Historial"], ["ajustes", "Ajustes"]];
 function render() {
   const ni = Object.keys(S.ing).length, nr = Object.keys(S.rec).length;
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-act="tab" data-k="${k}" aria-selected="${ui.tab === k}">${l}${k === "productos" && nr ? `<span class="cnt">${nr}</span>` : ""}${k === "ingredientes" && ni ? `<span class="cnt">${ni}</span>` : ""}</button>`).join("");
   $("#store-chip").textContent = S.mode === "db" ? "Guardado en la nube" : S.mode === "local" ? "Guardado en este navegador" : S.mode === "readonly" ? "Solo lectura" : "Conectando…";
   const v = $("#view");
   if (S.mode === "init") { v.innerHTML = `<div class="panel empty"><p>Cargando tus recetas…</p></div>`; return; }
-  v.innerHTML = ({ productos: viewProductos, ingredientes: viewIngredientes, importar: viewImportar, historial: viewHistorial, ajustes: viewAjustes }[ui.tab] || viewProductos)();
+  v.innerHTML = ({ productos: viewProductos, ingredientes: viewIngredientes, proveedores: viewProveedores, importar: viewImportar, historial: viewHistorial, ajustes: viewAjustes }[ui.tab] || viewProductos)();
   if (ui.tab === "ingredientes") renderIngRows();
   if (ui.tab === "productos") renderRecRows();
   if (ui.tab === "ajustes") updGastosCalc();
@@ -484,7 +491,7 @@ function openIng(id) {
   const i = id ? S.ing[id] : { nombre: "", categoria: "", proveedor: "", cantidad: 1, unidad: "kg", precio: "" };
   ingDraft = { id, ...JSON.parse(JSON.stringify(i)) };
   const cats = [...new Set(Object.values(S.ing).map(x => x.categoria).filter(Boolean))];
-  const provs = [...new Set(Object.values(S.ing).map(x => x.proveedor).filter(Boolean))];
+  const provs = [...new Set([...Object.values(S.prov).map(x => x.nombre), ...Object.values(S.ing).map(x => x.proveedor)].filter(Boolean))].sort();
   const used = id ? recipesUsing(new Set([id])) : [];
   modal(`<form id="ing-form"><div class="md-h"><h3>${id ? "Editar ingrediente" : "Nuevo ingrediente"}</h3><span class="spacer"></span><button type="button" class="btn ghost" data-act="close">Cerrar</button></div>
   <div class="md-b">
@@ -575,6 +582,57 @@ function updRecCalc() {
     <div><div class="k">Precio final</div><div class="v big num">${fmtMoney(c.precio)}</div></div>
     <div><div class="k">Ganás por unidad</div><div class="v num">${fmtMoney(c.ganancia)}</div></div>
     ${c.issues.filter(i => i.t !== "Sin ingredientes").length ? `<div style="grid-column:1/-1" class="warnbox">${esc([...new Set(c.issues.map(i => i.t))].join(" · "))}</div>` : ""}`;
+}
+
+/* ---------- Proveedores ---------- */
+function provRubros() {
+  // Tipos de mercadería: categorías de ingredientes + rubros cargados en proveedores
+  return [...new Set([...Object.values(S.ing).map(i => i.categoria), ...Object.values(S.prov).flatMap(p => p.rubros || [])].filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+}
+function viewProveedores() {
+  const provs = Object.entries(S.prov).sort(sortByName);
+  const rubros = provRubros();
+  const q = norm(ui.qProv || "");
+  const ingsDe = nombre => Object.values(S.ing).filter(i => norm(i.proveedor) === norm(nombre));
+  const card = ([id, p], rubro) => { const ings = ingsDe(p.nombre).filter(i => !rubro || i.categoria === rubro); return `<div class="prov" data-act="edit-prov" data-id="${id}">
+      <div class="row" style="gap:6px"><span class="name">${esc(p.nombre)}</span>${p.ejemplo ? `<span class="pill neu">ejemplo</span>` : ""}</div>
+      ${p.contacto || p.telefono ? `<div class="sub">${esc([p.contacto, p.telefono].filter(Boolean).join(" · "))}</div>` : ""}
+      <div class="sub">${ings.length ? `Le comprás: ${esc(ings.map(i => i.nombre).join(", "))}` : "Todavía no tiene ingredientes asignados"}</div></div>`; };
+  const match = ([, p]) => !q || norm(p.nombre + " " + (p.contacto || "") + " " + (p.rubros || []).join(" ")).includes(q);
+  const groups = rubros.map(r => {
+    const list = provs.filter(([, p]) => (p.rubros || []).includes(r)).filter(match);
+    const nIng = Object.values(S.ing).filter(i => i.categoria === r).length;
+    if (q && !list.length) return "";
+    return `<div class="panel rubro"><div class="row"><h3>${esc(r)}</h3><span class="sub">${nIng} ingrediente${nIng === 1 ? "" : "s"}</span><span class="spacer"></span><button class="btn sm ghost" data-act="new-prov" data-rubro="${esc(r)}">+ Proveedor</button></div>
+      ${list.length ? `<div class="prov-grid">${list.map(x => card(x, r)).join("")}</div>` : `<p class="note" style="margin:0">Sin proveedor cargado para este tipo de mercadería.</p>`}</div>`;
+  }).join("");
+  const sinRubro = provs.filter(([, p]) => !(p.rubros || []).length).filter(match);
+  if (!provs.length && !rubros.length) return `<div><h2>Proveedores</h2></div><div class="panel empty"><p>Cargá a quién le comprás cada tipo de mercadería: harinas, frescos, packaging. Así tenés a mano el contacto cuando cambia un precio.</p><button class="btn pri" data-act="new-prov">Agregar proveedor</button></div>`;
+  return `<div><h2>Proveedores</h2><p class="lead">Agrupados por tipo de mercadería. Tocá un proveedor para ver o editar sus datos. Los tipos salen de las categorías de tus ingredientes.</p></div>
+  <div class="row"><input class="in search" id="q-prov" data-live="1" placeholder="Buscar proveedor…" value="${esc(ui.qProv || "")}" aria-label="Buscar proveedor"><span class="spacer"></span><button class="btn pri" data-act="new-prov">Agregar proveedor</button></div>
+  <div style="display:flex;flex-direction:column;gap:14px" id="prov-groups">${groups}
+  ${sinRubro.length ? `<div class="panel rubro"><div class="row"><h3>Sin tipo asignado</h3></div><div class="prov-grid">${sinRubro.map(x => card(x)).join("")}</div></div>` : ""}</div>`;
+}
+let provDraft = null;
+function openProv(id, rubro) {
+  const p = id ? S.prov[id] : { nombre: "", rubros: rubro ? [rubro] : [], contacto: "", telefono: "", notas: "" };
+  provDraft = { id, ...JSON.parse(JSON.stringify(p)) };
+  const rubros = [...new Set([...provRubros(), ...(p.rubros || [])])];
+  const ings = id ? Object.values(S.ing).filter(i => norm(i.proveedor) === norm(p.nombre)) : [];
+  modal(`<form id="prov-form"><div class="md-h"><h3>${id ? "Editar proveedor" : "Nuevo proveedor"}</h3><span class="spacer"></span><button type="button" class="btn ghost" data-act="close">Cerrar</button></div>
+  <div class="md-b">
+    <div class="grid g2"><label class="f">Nombre<input class="in" id="p-nombre" required value="${esc(p.nombre)}" placeholder="ej. Distribuidora del pueblo"></label>
+    <label class="f">Persona de contacto<input class="in" id="p-contacto" value="${esc(p.contacto || "")}" placeholder="opcional"></label></div>
+    <div class="grid"><label class="f">Teléfono o WhatsApp<input class="in" id="p-tel" inputmode="tel" value="${esc(p.telefono || "")}" placeholder="opcional"></label>
+    <label class="f">Email o web<input class="in" id="p-mail" value="${esc(p.email || "")}" placeholder="opcional"></label></div>
+    <div><div class="note" style="margin-bottom:6px">Tipos de mercadería que te vende</div>
+      <div class="row" id="p-rubros">${rubros.map(r => `<label class="chip"><input type="checkbox" value="${esc(r)}" ${(p.rubros || []).includes(r) ? "checked" : ""}> ${esc(r)}</label>`).join("")}</div>
+      <div class="row" style="margin-top:8px"><input class="in" id="p-nuevo" placeholder="Otro tipo, ej. Verdulería" style="flex:1;min-width:160px"><button type="button" class="btn sm" data-act="add-rubro">Agregar tipo</button></div></div>
+    <label class="f">Notas<textarea class="in" id="p-notas" rows="3" placeholder="Días de entrega, pedido mínimo, forma de pago…">${esc(p.notas || "")}</textarea></label>
+    ${id ? `<p class="note" style="margin:0">${ings.length ? `Le comprás: ${esc(ings.map(i => i.nombre).join(", "))}. Para asignar otro ingrediente, editalo y elegí este proveedor.` : "Todavía no tiene ingredientes. Editá un ingrediente y elegí este proveedor."}</p>` : ""}
+  </div>
+  <div class="md-f">${id ? `<span id="del-zone"><button type="button" class="btn danger" data-act="ask-del-prov">Borrar</button></span>` : ""}<span class="spacer"></span><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`);
+  $("#p-nombre").focus();
 }
 
 /* ---------- Importar desde Word ---------- */
@@ -762,7 +820,7 @@ function viewHistorial() {
 
 /* ---------- Ajustes ---------- */
 function viewAjustes() {
-  const hasEj = Object.values(S.ing).some(i => i.ejemplo) || Object.values(S.rec).some(r => r.ejemplo);
+  const hasEj = Object.values(S.prov).some(i => i.ejemplo) || Object.values(S.ing).some(i => i.ejemplo) || Object.values(S.rec).some(r => r.ejemplo);
   return `<div><h2>Ajustes</h2></div>
   <div class="panel" style="padding:18px;display:flex;flex-direction:column;gap:14px">
     <h3>Precios</h3>
@@ -802,19 +860,23 @@ function updGastosCalc() {
 
 /* ====================== Modal y avisos ====================== */
 function modal(html) { $("#modal").innerHTML = html ? `<div class="ov" data-act="ov"><div class="md" role="dialog" aria-modal="true">${html}</div></div>` : ""; }
-function closeModal() { modal(""); recDraft = null; ingDraft = null; ui.preview = null; render(); }
+function closeModal() { modal(""); recDraft = null; ingDraft = null; provDraft = null; ui.preview = null; render(); }
 let toastT;
 function toast(t) { $("#toast-slot").innerHTML = `<div class="toast" role="status">${esc(t)}</div>`; clearTimeout(toastT); toastT = setTimeout(() => $("#toast-slot").innerHTML = "", 4200); }
 function setTab(k) { ui.tab = k; try { localStorage.setItem("chialli-tab", k); } catch {} render(); window.scrollTo({ top: 0 }); }
 
 /* ====================== Ejemplos ====================== */
 const SEED_I = [["Harina de arroz", "Harinas", 1, "kg", 2400], ["Fécula de mandioca", "Harinas", 1, "kg", 2100], ["Almidón de maíz", "Harinas", 1, "kg", 1900], ["Azúcar", "Secos", 1, "kg", 1300], ["Polvo de hornear sin TACC", "Secos", 50, "g", 650], ["Goma xántica", "Secos", 100, "g", 3500], ["Manteca", "Frescos", 200, "g", 2600], ["Huevos", "Frescos", 30, "u", 7500], ["Leche", "Frescos", 1, "l", 1400], ["Dulce de leche repostero", "Rellenos", 1, "kg", 5200], ["Coco rallado", "Rellenos", 500, "g", 3800], ["Esencia de vainilla", "Secos", 100, "ml", 1500], ["Bolsas celofán", "Packaging", 100, "u", 4000], ["Premezcla sin TACC", "Harinas", 1, "kg", 3200], ["Levadura seca", "Secos", 500, "g", 6500], ["Aceite de girasol", "Secos", 1.5, "l", 3300], ["Sal fina", "Secos", 500, "g", 900], ["Chocolate semiamargo", "Rellenos", 1, "kg", 14000], ["Cacao amargo", "Secos", 360, "g", 4500], ["Limones", "Frescos", 6, "u", 1500], ["Queso pategrás", "Frescos", 1, "kg", 12000], ["Puré de tomate", "Secos", 520, "g", 1100], ["Cajas de cartón", "Packaging", 10, "u", 6000]];
+const SEED_P = [["Distribuidora Celíaca", ["Harinas", "Secos"], "Pedidos por WhatsApp, entrega los martes"], ["Lácteos La Sierra", ["Frescos"], "Reparto diario a la mañana"], ["Dulces del Sur", ["Rellenos"], "Pedido mínimo 5 kg"], ["Envases Ventana", ["Packaging"], ""]];
 const SEED_R = [["Alfajores de maicena", "Alfajores", 24, "unidades", 120, [["Almidón de maíz", 300, "g"], ["Harina de arroz", 200, "g"], ["Manteca", 200, "g"], ["Azúcar", 150, "g"], ["Huevos", 3, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Esencia de vainilla", 5, "ml"], ["Dulce de leche repostero", 500, "g"], ["Coco rallado", 50, "g"], ["Bolsas celofán", 24, "u"]], []], ["Budín de vainilla", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Leche", 120, "ml"], ["Manteca", 100, "g"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"], ["Esencia de vainilla", 5, "ml"]], [["Molde descartable y etiqueta", 450]]], ["Budín de limón", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Aceite de girasol", 100, "ml"], ["Limones", 2, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"]], [["Molde descartable y etiqueta", 450]]], ["Alfajores de chocolate", "Alfajores", 18, "unidades", 120, [["Harina de arroz", 150, "g"], ["Almidón de maíz", 150, "g"], ["Cacao amargo", 40, "g"], ["Manteca", 150, "g"], ["Azúcar", 120, "g"], ["Huevos", 2, "u"], ["Polvo de hornear sin TACC", 8, "g"], ["Dulce de leche repostero", 400, "g"], ["Chocolate semiamargo", 400, "g"], ["Bolsas celofán", 18, "u"]], []], ["Pan de molde", "Panes", 1, "pan", 100, [["Premezcla sin TACC", 500, "g"], ["Levadura seca", 10, "g"], ["Aceite de girasol", 50, "ml"], ["Sal fina", 10, "g"], ["Azúcar", 15, "g"], ["Huevos", 2, "u"], ["Bolsas celofán", 1, "u"]], []], ["Chipá", "Panes", 30, "unidades", 110, [["Fécula de mandioca", 500, "g"], ["Queso pategrás", 300, "g"], ["Manteca", 100, "g"], ["Huevos", 2, "u"], ["Leche", 100, "ml"], ["Sal fina", 5, "g"], ["Bolsas celofán", 3, "u"]], []], ["Prepizza", "Panes", 4, "unidades", 100, [["Premezcla sin TACC", 400, "g"], ["Levadura seca", 8, "g"], ["Aceite de girasol", 30, "ml"], ["Sal fina", 8, "g"], ["Puré de tomate", 260, "g"], ["Bolsas celofán", 4, "u"]], []], ["Brownie", "Postres", 12, "porciones", 120, [["Chocolate semiamargo", 200, "g"], ["Manteca", 150, "g"], ["Azúcar", 200, "g"], ["Huevos", 4, "u"], ["Harina de arroz", 60, "g"], ["Cacao amargo", 30, "g"], ["Esencia de vainilla", 5, "ml"], ["Cajas de cartón", 1, "u"]], []]];
 async function seed(silent) {
   const now = new Date().toISOString();
   const ids = {};
   Object.entries(S.ing).forEach(([id, i]) => { if (i.ejemplo) ids[i.nombre] = id; });
-  for (const [nombre, categoria, cantidad, unidad, precio] of SEED_I) { if (ids[nombre]) continue; const id = uid(); ids[nombre] = id; await put("ingredientes", id, { nombre, categoria, proveedor: "", cantidad, unidad, precio, ejemplo: true, creado: now }); }
+  const provDe = cat => (SEED_P.find(p => p[1].includes(cat)) || [""])[0];
+  const haveP = new Set(Object.values(S.prov).map(p => norm(p.nombre)));
+  for (const [nombre, rubros, notas] of SEED_P) if (!haveP.has(norm(nombre))) await put("proveedores", uid(), { nombre, rubros, contacto: "", telefono: "", email: "", notas, ejemplo: true });
+  for (const [nombre, categoria, cantidad, unidad, precio] of SEED_I) { if (ids[nombre]) continue; const id = uid(); ids[nombre] = id; await put("ingredientes", id, { nombre, categoria, proveedor: provDe(categoria), cantidad, unidad, precio, ejemplo: true, creado: now }); }
   const have = new Set(Object.values(S.rec).filter(r => r.ejemplo).map(r => r.nombre));
   for (const [nombre, categoria, rinde, unidadRinde, margen, items, extras] of SEED_R) {
     if (have.has(nombre)) continue;
@@ -836,6 +898,11 @@ document.addEventListener("click", async e => {
     case "seed": t.disabled = true; await seed(); break;
     case "new-ing": openIng(null); break;
     case "edit-ing": openIng(id); break;
+    case "new-prov": openProv(null, t.dataset.rubro); break;
+    case "edit-prov": openProv(id); break;
+    case "add-rubro": { const v = $("#p-nuevo").value.trim(); if (!v) { $("#p-nuevo").focus(); break; } $("#p-rubros").insertAdjacentHTML("beforeend", `<label class="chip"><input type="checkbox" value="${esc(v)}" checked> ${esc(v)}</label>`); $("#p-nuevo").value = ""; break; }
+    case "ask-del-prov": $("#del-zone").innerHTML = `<span class="note">¿Borrar? </span><button type="button" class="btn danger" data-act="del-prov">Sí, borrar</button>`; break;
+    case "del-prov": await del("proveedores", provDraft.id); closeModal(); toast("Proveedor borrado."); break;
     case "new-rec": openRec(null); break;
     case "edit-rec": openRec(id); break;
     case "sel": if (t.checked) ui.sel.add(id); else ui.sel.delete(id); t.closest("tr").classList.toggle("sel", t.checked); renderBulk(); { const sa = $("#sel-all"); if (sa) { const vis = visibleIngs().map(r => r[0]); sa.checked = vis.every(x => ui.sel.has(x)); sa.indeterminate = !sa.checked && vis.some(x => ui.sel.has(x)); } } break;
@@ -864,18 +931,19 @@ document.addEventListener("click", async e => {
     case "add-gasto": readGastos(); ui.gastos.push({ nombre: "", monto: "" }); S.cfg = { ...S.cfg, gastos: ui.gastos }; render(); [...document.querySelectorAll('[data-gasto][data-f="nombre"]')].pop()?.focus(); break;
     case "rm-gasto": readGastos(); ui.gastos.splice(+t.dataset.k, 1); S.cfg = { ...S.cfg, gastos: ui.gastos }; render(); break;
     case "save-cfg": readGastos(); await saveCfg({ margen: parseNum($("#cfg-margen").value) || 0, redondeo: parseNum($("#cfg-red").value) || 0, iva: Math.max(0, parseNum($("#cfg-iva").value) || 0), moneda: $("#cfg-mon").value.trim() || "$", gastos: ui.gastos.filter(g => g.nombre || parseNum(g.monto)).map(g => ({ nombre: g.nombre, monto: parseNum(g.monto) || 0 })), unidadesMes: parseNum($("#cfg-umes").value) || "" }); toast("Ajustes guardados. Los precios ya están recalculados."); break;
-    case "backup": { const data = JSON.stringify({ app: "chialli", version: 1, fecha: new Date().toISOString(), ingredientes: S.ing, recetas: S.rec, config: S.cfg }); $("#backup-slot").innerHTML = `<textarea class="in" id="bk" rows="5" readonly style="width:100%;font-size:.8rem">${esc(data)}</textarea><div class="row"><button class="btn sm" data-act="copy-bk">Copiar</button></div>`; break; }
+    case "backup": { const data = JSON.stringify({ app: "chialli", version: 1, fecha: new Date().toISOString(), ingredientes: S.ing, recetas: S.rec, proveedores: S.prov, config: S.cfg }); $("#backup-slot").innerHTML = `<textarea class="in" id="bk" rows="5" readonly style="width:100%;font-size:.8rem">${esc(data)}</textarea><div class="row"><button class="btn sm" data-act="copy-bk">Copiar</button></div>`; break; }
     case "copy-bk": { const ta = $("#bk"); try { await navigator.clipboard.writeText(ta.value); toast("Respaldo copiado."); } catch { ta.select(); toast("Seleccioné el texto. Copialo con Ctrl+C o mantené apretado."); } break; }
     case "restore": $("#backup-slot").innerHTML = `<textarea class="in" id="rs" rows="5" style="width:100%;font-size:.8rem" placeholder="Pegá acá el respaldo"></textarea><div class="row"><span class="note">Los datos con el mismo nombre se reemplazan.</span><span class="spacer"></span><button class="btn sm pri" data-act="do-restore">Restaurar</button></div>`; $("#rs").focus(); break;
-    case "do-restore": { let d; try { d = JSON.parse($("#rs").value); } catch { toast("Ese texto no es un respaldo válido."); break; } if (d.app !== "chialli") { toast("Ese texto no es un respaldo de este panel."); break; } t.disabled = true; for (const [k, v] of Object.entries(d.ingredientes || {})) await put("ingredientes", k, v); for (const [k, v] of Object.entries(d.recetas || {})) await put("recetas", k, v); if (d.config) await saveCfg(d.config); render(); toast("Respaldo restaurado."); break; }
+    case "do-restore": { let d; try { d = JSON.parse($("#rs").value); } catch { toast("Ese texto no es un respaldo válido."); break; } if (d.app !== "chialli") { toast("Ese texto no es un respaldo de este panel."); break; } t.disabled = true; for (const [k, v] of Object.entries(d.ingredientes || {})) await put("ingredientes", k, v); for (const [k, v] of Object.entries(d.recetas || {})) await put("recetas", k, v); for (const [k, v] of Object.entries(d.proveedores || {})) await put("proveedores", k, v); if (d.config) await saveCfg(d.config); render(); toast("Respaldo restaurado."); break; }
     case "ask-del-ej": $("#ej-zone").innerHTML = `<span class="note">¿Borrar ejemplos? </span><button class="btn danger" data-act="del-ej">Sí, borrar</button>`; break;
-    case "del-ej": { t.disabled = true; for (const [k, r] of Object.entries(S.rec)) if (r.ejemplo) await del("recetas", k); for (const [k, i] of Object.entries(S.ing)) if (i.ejemplo) await del("ingredientes", k); render(); toast("Borré los datos de ejemplo."); break; }
+    case "del-ej": { t.disabled = true; for (const [k, r] of Object.entries(S.rec)) if (r.ejemplo) await del("recetas", k); for (const [k, i] of Object.entries(S.ing)) if (i.ejemplo) await del("ingredientes", k); for (const [k, x] of Object.entries(S.prov)) if (x.ejemplo) await del("proveedores", k); render(); toast("Borré los datos de ejemplo."); break; }
   }
 });
 document.addEventListener("input", e => {
   const t = e.target;
   if (t.id === "q-rec") { ui.qRec = t.value; renderRecRows(); }
   else if (t.id === "q-ing") { ui.qIng = t.value; renderIngRows(); }
+  else if (t.id === "q-prov") { ui.qProv = t.value; const pos = t.selectionStart; render(); const n = $("#q-prov"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
   else if (t.id === "bulk-val") ui.bulkVal = t.value;
   else if (t.dataset.item != null) { const it = recDraft.items[+t.dataset.item]; it[t.dataset.f] = t.dataset.f === "cantidad" ? t.value : t.value; updRecCalc(); }
   else if (t.dataset.extra != null) { recDraft.extras[+t.dataset.extra][t.dataset.f] = t.value; updRecCalc(); }
@@ -910,6 +978,13 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("submit", async e => {
   e.preventDefault();
+  if (e.target.id === "prov-form") {
+    const nombre = $("#p-nombre").value.trim(); if (!nombre) return;
+    const id = provDraft.id || uid(); const prev = S.prov[id] || {};
+    const data = { ...prev, nombre, contacto: $("#p-contacto").value.trim(), telefono: $("#p-tel").value.trim(), email: $("#p-mail").value.trim(), notas: $("#p-notas").value, rubros: [...document.querySelectorAll("#p-rubros input:checked")].map(x => x.value), actualizado: new Date().toISOString() };
+    if (prev.nombre && norm(prev.nombre) !== norm(nombre)) for (const [iid, i] of Object.entries(S.ing)) if (norm(i.proveedor) === norm(prev.nombre)) await put("ingredientes", iid, { ...i, proveedor: nombre });
+    await put("proveedores", id, data); closeModal(); toast(provDraft?.id ? "Proveedor guardado." : `Agregué «${nombre}».`); return;
+  }
   if (e.target.id === "ing-form") {
     const d = readIng(); if (!d.nombre) return;
     if (!(d.cantidad > 0)) { toast("Indicá de cuánto es el paquete, por ejemplo 1 kg o 30 unidades."); return; }
