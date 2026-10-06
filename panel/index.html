@@ -91,6 +91,11 @@ td.r,th.r{text-align:right}
 .name{font-weight:700}
 .sub{font-size:.85rem;color:var(--muted)}
 .price-in{width:110px;text-align:right}
+.money{position:relative;display:inline-flex;align-items:center}
+.money>i{position:absolute;left:10px;font-style:normal;color:var(--muted);pointer-events:none;font-variant-numeric:tabular-nums}
+.money>.in{padding-left:26px}
+label.f .money{display:flex}.money>.in{width:100%}
+td .money>.in{width:120px}
 tr.sel td{background:color-mix(in srgb,var(--bordo) 8%,transparent)}
 .clickable{cursor:pointer}
 .clickable:hover .name{color:var(--bordo);text-decoration:underline}
@@ -188,6 +193,7 @@ const UNITS = {
   u: { dim: "u", f: 1, label: "unidad" }, doc: { dim: "u", f: 12, label: "docena" },
   cda: { dim: "m", f: 15, label: "cucharada" }, cdta: { dim: "m", f: 5, label: "cucharadita" }, taza: { dim: "m", f: 240, label: "taza" },
 };
+const plural = (l, q) => q !== 1 && /^(litro|unidad|docena)$/.test(l) ? (l === "unidad" ? "unidades" : l + "s") : l;
 const BUY_UNITS = ["kg", "g", "l", "ml", "u", "doc"];
 const USE_UNITS = ["g", "kg", "ml", "l", "u", "cda", "cdta", "taza"];
 const costLabel = ing => UNITS[ing.unidad]?.dim === "u" ? "por unidad" : (ing.unidad === "l" || ing.unidad === "ml" ? "por litro" : "por kg");
@@ -256,6 +262,8 @@ async function initStore() {
     db.doc("config/general").onSnapshot(s => { S.cfg = { ...DEFAULT_CFG, ...(s.exists ? s.data() : {}) }; scheduleRender(); }, fail);
   } else {
     S.mode = "local"; lsLoad();
+    let seeded = false; try { seeded = !!localStorage.getItem("chialli-seeded"); } catch {}
+    if (!seeded && !Object.keys(S.ing).length && !Object.keys(S.rec).length) { await seed(true); toast("Te dejé productos de ejemplo cargados para probar. Los borrás desde Ajustes."); }
   }
   render();
 }
@@ -413,8 +421,8 @@ function renderIngRows() {
     <tr class="${ui.sel.has(id) ? "sel" : ""}">
       <td><input type="checkbox" data-act="sel" data-id="${id}" ${ui.sel.has(id) ? "checked" : ""} aria-label="Seleccionar ${esc(i.nombre)}"></td>
       <td><div class="name">${esc(i.nombre)}</div><div class="sub">${esc([i.categoria, i.proveedor].filter(Boolean).join(" · ") || "—")}${i.ejemplo ? ` · <span class="pill neu">ejemplo</span>` : ""}</div></td>
-      <td class="num">${fmtNum(parseNum(i.cantidad))} ${esc(UNITS[i.unidad]?.label || i.unidad)}${parseNum(i.cantidad) > 1 && UNITS[i.unidad]?.dim === "u" ? "es" : ""}</td>
-      <td class="r"><input class="in price-in num" data-live="1" data-act="price" data-id="${id}" inputmode="decimal" value="${sinP ? "" : esc(fmtNum(parseNum(i.precio)))}" placeholder="Sin precio" aria-label="Precio de ${esc(i.nombre)}"></td>
+      <td class="num">${fmtNum(parseNum(i.cantidad))} ${esc(plural(UNITS[i.unidad]?.label || i.unidad, parseNum(i.cantidad)))}</td>
+      <td class="r"><span class="money"><i>${esc(S.cfg.moneda || "$")}</i><input class="in price-in num" data-live="1" data-act="price" data-id="${id}" inputmode="decimal" value="${sinP ? "" : esc(fmtNum(parseNum(i.precio)))}" placeholder="Sin precio" aria-label="Precio de ${esc(i.nombre)}"></span></td>
       <td class="r num">${sinP ? `<span class="pill warn">Falta precio</span>` : `${fmtMoney(per)} <span class="sub">${costLabel(i)}</span>`}</td>
       <td class="r num">${usage[id] ? `${usage[id]} producto${usage[id] > 1 ? "s" : ""}` : `<span class="sub">—</span>`}</td>
       <td class="r"><button class="btn sm ghost" data-act="edit-ing" data-id="${id}">Editar</button></td></tr>`; }).join("")
@@ -487,7 +495,7 @@ function openIng(id) {
     <div class="grid">
       <label class="f">Lo compro en paquetes de<input class="in num" id="i-cant" inputmode="decimal" required value="${esc(fmtNum(parseNum(i.cantidad)))}"></label>
       <label class="f">Unidad<select class="in" id="i-unid">${BUY_UNITS.map(u => `<option value="${u}" ${u === i.unidad ? "selected" : ""}>${UNITS[u].label}</option>`).join("")}</select></label>
-      <label class="f">Precio del paquete<input class="in num" id="i-precio" inputmode="decimal" value="${parseNum(i.precio) > 0 ? esc(fmtNum(parseNum(i.precio))) : ""}" placeholder="0"></label>
+      <label class="f">Precio del paquete<span class="money"><i>${esc(S.cfg.moneda || "$")}</i><input class="in num" id="i-precio" inputmode="decimal" value="${parseNum(i.precio) > 0 ? esc(fmtNum(parseNum(i.precio))) : ""}" placeholder="0"></span></label>
       <label class="f">Proveedor<input class="in" id="i-prov" list="dl-prov" value="${esc(i.proveedor || "")}" placeholder="opcional"></label>
     </div>
     <div class="calc" id="i-calc"></div>
@@ -800,23 +808,20 @@ function toast(t) { $("#toast-slot").innerHTML = `<div class="toast" role="statu
 function setTab(k) { ui.tab = k; try { localStorage.setItem("chialli-tab", k); } catch {} render(); window.scrollTo({ top: 0 }); }
 
 /* ====================== Ejemplos ====================== */
-async function seed() {
+const SEED_I = [["Harina de arroz", "Harinas", 1, "kg", 2400], ["Fécula de mandioca", "Harinas", 1, "kg", 2100], ["Almidón de maíz", "Harinas", 1, "kg", 1900], ["Azúcar", "Secos", 1, "kg", 1300], ["Polvo de hornear sin TACC", "Secos", 50, "g", 650], ["Goma xántica", "Secos", 100, "g", 3500], ["Manteca", "Frescos", 200, "g", 2600], ["Huevos", "Frescos", 30, "u", 7500], ["Leche", "Frescos", 1, "l", 1400], ["Dulce de leche repostero", "Rellenos", 1, "kg", 5200], ["Coco rallado", "Rellenos", 500, "g", 3800], ["Esencia de vainilla", "Secos", 100, "ml", 1500], ["Bolsas celofán", "Packaging", 100, "u", 4000], ["Premezcla sin TACC", "Harinas", 1, "kg", 3200], ["Levadura seca", "Secos", 500, "g", 6500], ["Aceite de girasol", "Secos", 1.5, "l", 3300], ["Sal fina", "Secos", 500, "g", 900], ["Chocolate semiamargo", "Rellenos", 1, "kg", 14000], ["Cacao amargo", "Secos", 360, "g", 4500], ["Limones", "Frescos", 6, "u", 1500], ["Queso pategrás", "Frescos", 1, "kg", 12000], ["Puré de tomate", "Secos", 520, "g", 1100], ["Cajas de cartón", "Packaging", 10, "u", 6000]];
+const SEED_R = [["Alfajores de maicena", "Alfajores", 24, "unidades", 120, [["Almidón de maíz", 300, "g"], ["Harina de arroz", 200, "g"], ["Manteca", 200, "g"], ["Azúcar", 150, "g"], ["Huevos", 3, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Esencia de vainilla", 5, "ml"], ["Dulce de leche repostero", 500, "g"], ["Coco rallado", 50, "g"], ["Bolsas celofán", 24, "u"]], []], ["Budín de vainilla", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Leche", 120, "ml"], ["Manteca", 100, "g"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"], ["Esencia de vainilla", 5, "ml"]], [["Molde descartable y etiqueta", 450]]], ["Budín de limón", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Aceite de girasol", 100, "ml"], ["Limones", 2, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"]], [["Molde descartable y etiqueta", 450]]], ["Alfajores de chocolate", "Alfajores", 18, "unidades", 120, [["Harina de arroz", 150, "g"], ["Almidón de maíz", 150, "g"], ["Cacao amargo", 40, "g"], ["Manteca", 150, "g"], ["Azúcar", 120, "g"], ["Huevos", 2, "u"], ["Polvo de hornear sin TACC", 8, "g"], ["Dulce de leche repostero", 400, "g"], ["Chocolate semiamargo", 400, "g"], ["Bolsas celofán", 18, "u"]], []], ["Pan de molde", "Panes", 1, "pan", 100, [["Premezcla sin TACC", 500, "g"], ["Levadura seca", 10, "g"], ["Aceite de girasol", 50, "ml"], ["Sal fina", 10, "g"], ["Azúcar", 15, "g"], ["Huevos", 2, "u"], ["Bolsas celofán", 1, "u"]], []], ["Chipá", "Panes", 30, "unidades", 110, [["Fécula de mandioca", 500, "g"], ["Queso pategrás", 300, "g"], ["Manteca", 100, "g"], ["Huevos", 2, "u"], ["Leche", 100, "ml"], ["Sal fina", 5, "g"], ["Bolsas celofán", 3, "u"]], []], ["Prepizza", "Panes", 4, "unidades", 100, [["Premezcla sin TACC", 400, "g"], ["Levadura seca", 8, "g"], ["Aceite de girasol", 30, "ml"], ["Sal fina", 8, "g"], ["Puré de tomate", 260, "g"], ["Bolsas celofán", 4, "u"]], []], ["Brownie", "Postres", 12, "porciones", 120, [["Chocolate semiamargo", 200, "g"], ["Manteca", 150, "g"], ["Azúcar", 200, "g"], ["Huevos", 4, "u"], ["Harina de arroz", 60, "g"], ["Cacao amargo", 30, "g"], ["Esencia de vainilla", 5, "ml"], ["Cajas de cartón", 1, "u"]], []]];
+async function seed(silent) {
   const now = new Date().toISOString();
-  const I = [
-    ["Harina de arroz", "Harinas", 1, "kg", 2400], ["Fécula de mandioca", "Harinas", 1, "kg", 2100], ["Almidón de maíz", "Harinas", 1, "kg", 1900],
-    ["Azúcar", "Secos", 1, "kg", 1300], ["Polvo de hornear sin TACC", "Secos", 50, "g", 650], ["Goma xántica", "Secos", 100, "g", 3500],
-    ["Manteca", "Frescos", 200, "g", 2600], ["Huevos", "Frescos", 30, "u", 7500], ["Leche", "Frescos", 1, "l", 1400],
-    ["Dulce de leche repostero", "Rellenos", 1, "kg", 5200], ["Coco rallado", "Rellenos", 500, "g", 3800], ["Esencia de vainilla", "Secos", 100, "ml", 1500], ["Bolsas celofán", "Packaging", 100, "u", 4000],
-  ];
   const ids = {};
-  for (const [nombre, categoria, cantidad, unidad, precio] of I) { const id = uid(); ids[nombre] = id; await put("ingredientes", id, { nombre, categoria, proveedor: "", cantidad, unidad, precio, ejemplo: true, creado: now }); }
-  const R = [
-    ["Alfajores de maicena", "Alfajores", 24, "unidades", 120, [["Almidón de maíz", 300, "g"], ["Harina de arroz", 200, "g"], ["Manteca", 200, "g"], ["Azúcar", 150, "g"], ["Huevos", 3, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Esencia de vainilla", 5, "ml"], ["Dulce de leche repostero", 500, "g"], ["Coco rallado", 50, "g"], ["Bolsas celofán", 24, "u"]]],
-    ["Budín de vainilla", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Leche", 120, "ml"], ["Manteca", 100, "g"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"], ["Esencia de vainilla", 5, "ml"]]],
-  ];
-  for (const [nombre, categoria, rinde, unidadRinde, margen, items] of R)
-    await put("recetas", uid(), { nombre, categoria, rinde, unidadRinde, margen, items: items.map(([n, c, u]) => ({ ingId: ids[n], cantidad: c, unidad: u })), extras: nombre.startsWith("Budín") ? [{ nombre: "Molde descartable y etiqueta", monto: 450 }] : [], notas: "", ejemplo: true });
-  render(); toast("Cargué 13 ingredientes y 2 recetas de ejemplo. Los precios son de muestra.");
+  Object.entries(S.ing).forEach(([id, i]) => { if (i.ejemplo) ids[i.nombre] = id; });
+  for (const [nombre, categoria, cantidad, unidad, precio] of SEED_I) { if (ids[nombre]) continue; const id = uid(); ids[nombre] = id; await put("ingredientes", id, { nombre, categoria, proveedor: "", cantidad, unidad, precio, ejemplo: true, creado: now }); }
+  const have = new Set(Object.values(S.rec).filter(r => r.ejemplo).map(r => r.nombre));
+  for (const [nombre, categoria, rinde, unidadRinde, margen, items, extras] of SEED_R) {
+    if (have.has(nombre)) continue;
+    await put("recetas", uid(), { nombre, categoria, rinde, unidadRinde, margen, items: items.map(([n, c, u]) => ({ ingId: ids[n], cantidad: c, unidad: u })), extras: extras.map(([n, m]) => ({ nombre: n, monto: m })), notas: "", ejemplo: true });
+  }
+  try { localStorage.setItem("chialli-seeded", "1"); } catch {}
+  render(); if (!silent) toast(`Cargué ${SEED_I.length} ingredientes y ${SEED_R.length} recetas de ejemplo. Los precios son de muestra.`);
 }
 
 /* ====================== Eventos ====================== */
@@ -851,7 +856,7 @@ document.addEventListener("click", async e => {
     case "rm-item": recDraft.items.splice(+t.dataset.k, 1); renderItems(); updRecCalc(); break;
     case "add-extra": (recDraft.extras ||= []).push({ nombre: "", monto: "" }); renderExtras(); break;
     case "rm-extra": recDraft.extras.splice(+t.dataset.k, 1); renderExtras(); updRecCalc(); break;
-    case "new-ing-inline": { const wrap = t.parentElement; if ($("#quick-ing")) break; wrap.insertAdjacentHTML("afterend", `<div class="row" id="quick-ing" style="margin-top:8px;background:var(--cream);padding:10px;border-radius:8px"><input class="in" id="q-n" placeholder="Nombre" style="flex:1;min-width:140px"><input class="in num" id="q-c" placeholder="Cantidad" value="1" style="width:80px"><select class="in" id="q-u">${BUY_UNITS.map(u => `<option value="${u}">${UNITS[u].label}</option>`).join("")}</select><input class="in num" id="q-p" placeholder="Precio" style="width:100px"><button type="button" class="btn sm pri" data-act="quick-ing-save">Crear</button></div>`); $("#q-n").focus(); break; }
+    case "new-ing-inline": { const wrap = t.parentElement; if ($("#quick-ing")) break; wrap.insertAdjacentHTML("afterend", `<div class="row" id="quick-ing" style="margin-top:8px;background:var(--cream);padding:10px;border-radius:8px"><input class="in" id="q-n" placeholder="Nombre" style="flex:1;min-width:140px"><input class="in num" id="q-c" placeholder="Cantidad" value="1" style="width:80px"><select class="in" id="q-u">${BUY_UNITS.map(u => `<option value="${u}">${UNITS[u].label}</option>`).join("")}</select><span class="money"><i>${esc(S.cfg.moneda || "$")}</i><input class="in num" id="q-p" placeholder="Precio" style="width:110px"></span><button type="button" class="btn sm pri" data-act="quick-ing-save">Crear</button></div>`); $("#q-n").focus(); break; }
     case "quick-ing-save": { const n = $("#q-n").value.trim(); if (!n) { $("#q-n").focus(); break; } const nid = uid(); await put("ingredientes", nid, { nombre: n, categoria: "", proveedor: "", cantidad: parseNum($("#q-c").value) || 1, unidad: $("#q-u").value, precio: parseNum($("#q-p").value) || 0, creado: new Date().toISOString() }); readRecHead(); const empty = recDraft.items.find(i => !i.ingId); if (empty) empty.ingId = nid; else recDraft.items.push({ ingId: nid, cantidad: "", unidad: UNITS[$("#q-u").value].dim === "u" ? "u" : "g" }); $("#quick-ing").remove(); renderItems(); updRecCalc(); toast(`Creé «${n}».`); break; }
     case "parse-paste": { const txt = $("#paste").value; if (!txt.trim()) { $("#paste").focus(); break; } loadDrafts(parseRecipes(txt.split(/\r?\n/))); break; }
     case "import-cancel": ui.drafts = null; render(); break;
