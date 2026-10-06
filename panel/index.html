@@ -276,6 +276,7 @@ async function initStore() {
     S.mode = "local"; lsLoad();
     let seeded = false; try { seeded = !!localStorage.getItem("chialli-seeded"); } catch {}
     if (!seeded && !Object.keys(S.ing).length && !Object.keys(S.rec).length) { await seed(true); toast("Te dejé productos de ejemplo cargados para probar. Los borrás desde Ajustes."); }
+    else await upgradeExamples();
   }
   render();
 }
@@ -906,6 +907,20 @@ const SEED_I = [["Harina de arroz", "Harinas", 1, "kg", 2400], ["Fécula de mand
 const SEED_P = [["Distribuidora Celíaca", ["Harinas", "Secos"], "Pedidos por WhatsApp, entrega los martes"], ["Lácteos La Sierra", ["Frescos"], "Reparto diario a la mañana"], ["Dulces del Sur", ["Rellenos"], "Pedido mínimo 5 kg"], ["Envases Ventana", ["Packaging"], ""]];
 const SEED_STOCK = { "Huevos": [12, 30], "Manteca": [300, 400], "Dulce de leche repostero": [0, 1], "Harina de arroz": [5, 2], "Premezcla sin TACC": [1.5, 2] };
 const SEED_R = [["Alfajores de maicena", "Alfajores", 24, "unidades", 120, [["Almidón de maíz", 300, "g"], ["Harina de arroz", 200, "g"], ["Manteca", 200, "g"], ["Azúcar", 150, "g"], ["Huevos", 3, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Esencia de vainilla", 5, "ml"], ["Dulce de leche repostero", 500, "g"], ["Coco rallado", 50, "g"], ["Bolsas celofán", 24, "u"]], []], ["Budín de vainilla", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Leche", 120, "ml"], ["Manteca", 100, "g"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"], ["Esencia de vainilla", 5, "ml"]], [["Molde descartable y etiqueta", 450]]], ["Budín de limón", "Budines", 1, "budín", 110, [["Harina de arroz", 150, "g"], ["Fécula de mandioca", 100, "g"], ["Azúcar", 180, "g"], ["Huevos", 3, "u"], ["Aceite de girasol", 100, "ml"], ["Limones", 2, "u"], ["Polvo de hornear sin TACC", 10, "g"], ["Goma xántica", 3, "g"]], [["Molde descartable y etiqueta", 450]]], ["Alfajores de chocolate", "Alfajores", 18, "unidades", 120, [["Harina de arroz", 150, "g"], ["Almidón de maíz", 150, "g"], ["Cacao amargo", 40, "g"], ["Manteca", 150, "g"], ["Azúcar", 120, "g"], ["Huevos", 2, "u"], ["Polvo de hornear sin TACC", 8, "g"], ["Dulce de leche repostero", 400, "g"], ["Chocolate semiamargo", 400, "g"], ["Bolsas celofán", 18, "u"]], []], ["Pan de molde", "Panes", 1, "pan", 100, [["Premezcla sin TACC", 500, "g"], ["Levadura seca", 10, "g"], ["Aceite de girasol", 50, "ml"], ["Sal fina", 10, "g"], ["Azúcar", 15, "g"], ["Huevos", 2, "u"], ["Bolsas celofán", 1, "u"]], []], ["Chipá", "Panes", 30, "unidades", 110, [["Fécula de mandioca", 500, "g"], ["Queso pategrás", 300, "g"], ["Manteca", 100, "g"], ["Huevos", 2, "u"], ["Leche", 100, "ml"], ["Sal fina", 5, "g"], ["Bolsas celofán", 3, "u"]], []], ["Prepizza", "Panes", 4, "unidades", 100, [["Premezcla sin TACC", 400, "g"], ["Levadura seca", 8, "g"], ["Aceite de girasol", 30, "ml"], ["Sal fina", 8, "g"], ["Puré de tomate", 260, "g"], ["Bolsas celofán", 4, "u"]], []], ["Brownie", "Postres", 12, "porciones", 120, [["Chocolate semiamargo", 200, "g"], ["Manteca", 150, "g"], ["Azúcar", 200, "g"], ["Huevos", 4, "u"], ["Harina de arroz", 60, "g"], ["Cacao amargo", 30, "g"], ["Esencia de vainilla", 5, "ml"], ["Cajas de cartón", 1, "u"]], []]];
+// Los ejemplos cargados con una versión anterior del panel no tenían stock ni proveedores: se completan.
+async function upgradeExamples() {
+  const ej = Object.entries(S.ing).filter(([, i]) => i.ejemplo); if (!ej.length) return;
+  const needs = ej.some(([, i]) => !hasStock(i) || !i.proveedor) || !Object.values(S.prov).some(p => p.ejemplo);
+  if (!needs) return;
+  await seed(true);
+  const provDe = cat => (SEED_P.find(p => p[1].includes(cat)) || [""])[0];
+  for (const [id, i] of Object.entries(S.ing)) {
+    if (!i.ejemplo) continue; const def = SEED_I.find(x => x[0] === i.nombre); const upd = { ...i };
+    if (!hasStock(i)) { const [st, mn] = SEED_STOCK[i.nombre] || [(def ? def[2] : 1) * 3, def ? def[2] : 1]; upd.stock = st; upd.stockMinimo = mn; }
+    if (!i.proveedor) upd.proveedor = provDe(i.categoria);
+    await put("ingredientes", id, upd);
+  }
+}
 async function seed(silent) {
   const now = new Date().toISOString();
   const ids = {};
