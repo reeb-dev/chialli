@@ -292,7 +292,8 @@ document.addEventListener("focusout", () => { if (pendingRender) { pendingRender
 
 /* ---------- Nube propia (versión de GitHub): servidor en Neon ---------- */
 const nube = {
-  url: (window.CHIALLI_API ?? "https://br-aged-sky-b77ot7re-panel.compute.c-13.us-east-1.aws.neon.tech").replace(/\/$/, ""),
+  // Nube apagada por ahora. Para prenderla: "https://br-aged-sky-b77ot7re-panel.compute.c-13.us-east-1.aws.neon.tech"
+  url: (window.CHIALLI_API ?? "").replace(/\/$/, ""),
   q: [], timer: null, busy: false, err: false, poll: null,
   get tok() { try { return localStorage.getItem("chialli-token") || ""; } catch { return ""; } },
   set tok(v) { try { v ? localStorage.setItem("chialli-token", v) : localStorage.removeItem("chialli-token"); } catch {} },
