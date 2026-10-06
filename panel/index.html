@@ -185,7 +185,7 @@ a.btn{text-decoration:none}
 .lead-dots{flex:1;border-bottom:1.5px dotted #CDB9A0;transform:translateY(-4px)}
 .hoja-nota{margin:16px 0 0;font-style:italic;color:#5a4645}
 .hoja-f{margin-top:18px;padding-top:10px;border-top:1px solid #E8DAC5;font-size:.8rem;color:#76605D;text-align:center}
-@media print{body *{visibility:hidden}#hoja-slot,#hoja-slot *{visibility:visible}#hoja-slot{position:absolute;left:0;top:0;width:100%}.hoja{box-shadow:none;border:0;max-width:none}}
+@media print{body{background:#fff !important}body *{visibility:hidden}#hoja-slot,#hoja-slot *{visibility:visible}#hoja-slot{position:absolute;left:0;top:0;width:100%}.hoja{box-shadow:none;border:0;max-width:none}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:calc(100% - 32px)}
 .hist-day{font-family:var(--f-head);font-weight:600;padding:10px 12px;background:var(--cream)}
 @media (prefers-reduced-motion:no-preference){.toast{animation:pop .2s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
@@ -256,12 +256,14 @@ async function put(col, id, data) {
   const map = col === "ingredientes" ? S.ing : col === "proveedores" ? S.prov : S.rec;
   map[id] = data;
   if (db) await db.collection(col).doc(id).set(data);
+  else if (S.mode === "nube") nube.op({ op: "put", col, id, data });
   else lsSave();
 }
 async function del(col, id) {
   const map = col === "ingredientes" ? S.ing : col === "proveedores" ? S.prov : S.rec;
   delete map[id];
   if (db) await db.collection(col).doc(id).delete();
+  else if (S.mode === "nube") nube.op({ op: "del", col, id });
   else lsSave();
 }
 async function addHist(entries) {
@@ -270,11 +272,13 @@ async function addHist(entries) {
   const h = { id: uid(), fecha: new Date().toISOString(), cambios: entries };
   S.hist.unshift(h);
   if (db) await db.collection("historial").doc(h.id).set({ fecha: h.fecha, cambios: h.cambios });
+  else if (S.mode === "nube") nube.op({ op: "put", col: "historial", id: h.id, data: { fecha: h.fecha, cambios: h.cambios } });
   else lsSave();
 }
 async function saveCfg(c) {
   S.cfg = { ...S.cfg, ...c };
   if (db) await db.doc("config/general").set(S.cfg);
+  else if (S.mode === "nube") nube.op({ op: "put", col: "config", id: "general", data: S.cfg });
   else lsSave();
 }
 
@@ -285,6 +289,92 @@ function scheduleRender() {
 }
 let pendingRender = false;
 document.addEventListener("focusout", () => { if (pendingRender) { pendingRender = false; setTimeout(scheduleRender, 0); } });
+
+/* ---------- Nube propia (versión de GitHub): servidor en Neon ---------- */
+const nube = {
+  url: (window.CHIALLI_API ?? "https://br-aged-sky-b77ot7re-panel.compute.c-13.us-east-1.aws.neon.tech").replace(/\/$/, ""),
+  q: [], timer: null, busy: false, err: false, poll: null,
+  get tok() { try { return localStorage.getItem("chialli-token") || ""; } catch { return ""; } },
+  set tok(v) { try { v ? localStorage.setItem("chialli-token", v) : localStorage.removeItem("chialli-token"); } catch {} },
+  async api(path, body) {
+    const r = await fetch(this.url + path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", ...(this.tok ? { Authorization: "Bearer " + this.tok } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401 && path !== "/login") { this.salir(true); throw new Error(d.error || "Sesión vencida"); }
+    if (!r.ok) throw new Error(d.error || "No se pudo conectar");
+    return d;
+  },
+  op(o) { this.q = this.q.filter(x => !(x.col === o.col && x.id === o.id)); this.q.push(o); clearTimeout(this.timer); this.timer = setTimeout(() => this.flush(), 400); },
+  async flush() {
+    if (this.busy || !this.q.length) return; this.busy = true; const ops = this.q.splice(0, 400);
+    try { await this.api("/guardar", { ops }); if (this.err) { this.err = false; render(); } }
+    catch (e) { this.q = [...ops.filter(o => !this.q.some(x => x.col === o.col && x.id === o.id)), ...this.q]; if (!this.err) { this.err = true; toast("No se pudo guardar en la nube. Reintento solo cuando vuelva la conexión."); render(); } setTimeout(() => this.flush(), 8000); }
+    finally { this.busy = false; if (this.q.length && !this.err) this.flush(); }
+  },
+  aplicar(docs) {
+    const m = { ingredientes: {}, recetas: {}, proveedores: {} }, hist = []; let cfg = {};
+    for (const d of docs) { if (m[d.col]) m[d.col][d.id] = d.data; else if (d.col === "historial") hist.push({ id: d.id, ...d.data }); else if (d.col === "config" && d.id === "general") cfg = d.data; }
+    // Lo que todavía no se subió manda sobre lo que viene del servidor
+    for (const o of this.q) { const t = o.col === "ingredientes" ? m.ingredientes : o.col === "recetas" ? m.recetas : o.col === "proveedores" ? m.proveedores : null; if (t) { if (o.op === "put") t[o.id] = o.data; else delete t[o.id]; } }
+    S.ing = m.ingredientes; S.rec = m.recetas; S.prov = m.proveedores; S.hist = hist.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))); S.cfg = { ...DEFAULT_CFG, ...cfg };
+  },
+  async cargar(primera) {
+    const d = await this.api("/datos"); this.email = d.email; this.dueno = d.dueno;
+    if (primera && !d.docs.length) {
+      lsLoad();
+      if (Object.keys(S.ing).length || Object.keys(S.rec).length) {
+        for (const [col, map] of [["ingredientes", S.ing], ["recetas", S.rec], ["proveedores", S.prov]]) for (const [id, data] of Object.entries(map)) this.op({ op: "put", col, id, data });
+        S.hist.forEach(h => this.op({ op: "put", col: "historial", id: h.id, data: { fecha: h.fecha, cambios: h.cambios } }));
+        this.op({ op: "put", col: "config", id: "general", data: S.cfg });
+        toast("Subí a la nube los datos que tenías en este navegador.");
+      } else { await seed(true); toast("Te dejé productos de ejemplo cargados para probar. Los borrás desde Ajustes."); }
+      return;
+    }
+    if (this.q.length || this.busy) return; // no pisar cambios en vuelo
+    this.aplicar(d.docs);
+  },
+  async start() {
+    if (!this.tok) { S.mode = "login"; try { this.hay = (await this.api("/")).hayUsuarios; } catch { this.hay = true; this.sinRed = true; } render(); return; }
+    S.mode = "nube";
+    try { await this.cargar(true); } catch (e) { if (S.mode === "nube") { lsLoad(); S.mode = "nube"; this.err = true; toast("No me pude conectar a la nube. Muestro lo último guardado en este navegador."); } }
+    render();
+    clearInterval(this.poll);
+    this.poll = setInterval(() => { if (document.visibilityState === "visible" && S.mode === "nube" && !document.querySelector(".ov")) this.cargar().then(scheduleRender).catch(() => {}); }, 30000);
+  },
+  salir(vencida) { this.tok = ""; clearInterval(this.poll); S.mode = "login"; S.ing = {}; S.rec = {}; S.prov = {}; S.hist = []; render(); if (vencida) toast("Tu sesión venció. Volvé a ingresar."); },
+};
+window.addEventListener("beforeunload", e => { if (S.mode === "nube" && nube.q.length) { nube.flush(); e.preventDefault(); } });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") nube.flush(); else if (S.mode === "nube" && !document.querySelector(".ov")) nube.cargar().then(scheduleRender).catch(() => {}); });
+function viewLogin() {
+  const reg = !nube.hay;
+  return `<div class="panel" style="max-width:420px;margin:24px auto;padding:22px;display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0">${reg ? "Activá tu panel" : "Ingresá a tu panel"}</h2>
+    <p class="note" style="margin:0">${reg ? "Es la primera vez: creá tu usuario con el código de activación. Después vas a poder sumar a otras personas desde Ajustes." : "Tus recetas y precios se guardan en la nube y los ves igual en el celu y en la compu."}</p>
+    <form id="login-form" style="display:flex;flex-direction:column;gap:10px">
+      <label class="f">Email<input class="in" id="lg-email" type="email" autocomplete="username" required></label>
+      <label class="f">Contraseña${reg ? " (mínimo 8 caracteres)" : ""}<input class="in" id="lg-clave" type="password" autocomplete="${reg ? "new-password" : "current-password"}" minlength="8" required></label>
+      ${reg ? `<label class="f">Código de activación<input class="in" id="lg-codigo" autocomplete="off" required></label>` : ""}
+      <button class="btn pri" type="submit">${reg ? "Crear usuario y entrar" : "Entrar"}</button>
+      <p class="note" id="lg-msg" role="alert" style="margin:0;color:var(--bad)">${nube.sinRed ? "No me pude conectar. Revisá internet y recargá." : ""}</p>
+    </form>
+    ${reg ? "" : `<p class="note" style="margin:0">¿Te olvidaste la contraseña? Pedile a quien maneja el panel que te la cambie desde Ajustes.</p>`}
+  </div>`;
+}
+document.addEventListener("submit", async e => {
+  if (e.target.id !== "login-form") return; e.preventDefault();
+  const b = e.target.querySelector("button"); b.disabled = true; const msg = $("#lg-msg"); msg.textContent = "";
+  const email = $("#lg-email").value, clave = $("#lg-clave").value, codigo = $("#lg-codigo")?.value;
+  try { const r = await nube.api(codigo != null ? "/registro" : "/login", { email, clave, codigo }); nube.tok = r.token; await nube.start(); }
+  catch (err) { msg.textContent = err.message; b.disabled = false; }
+});
+async function viewUsuarios() {
+  const slot = $("#usuarios-slot"); if (!slot) return;
+  try {
+    const { usuarios } = await nube.api("/usuarios");
+    slot.innerHTML = `<div class="row" style="flex-direction:column;align-items:stretch;gap:6px">${usuarios.map(u => `<div class="row"><span>${esc(u.email)}</span>${u.dueno ? `<span class="pill">Dueña/o</span>` : `<span class="spacer"></span><button class="btn sm danger" data-act="usr-del" data-email="${esc(u.email)}">Quitar acceso</button>`}</div>`).join("")}</div>
+      <div class="row" style="align-items:flex-end"><label class="f" style="flex:1 1 180px">Email<input class="in" id="usr-email" type="email" autocomplete="off"></label><label class="f" style="flex:1 1 140px">Contraseña<input class="in" id="usr-clave" type="text" autocomplete="off" placeholder="mínimo 8"></label><button class="btn" data-act="usr-add">Dar acceso</button></div>
+      <p class="note" style="margin:0">Si ponés un email que ya tiene acceso, le cambiás la contraseña.</p>`;
+  } catch (e) { slot.innerHTML = `<p class="note">${esc(e.message)}</p>`; }
+}
 
 async function initStore() {
   let api = null;
@@ -299,6 +389,8 @@ async function initStore() {
     db.collection("recetas").onSnapshot(s => { const m = {}; s.docs.forEach(d => m[d.id] = d.data()); S.rec = m; scheduleRender(); }, fail);
     db.collection("historial").orderBy("fecha", "desc").limit(150).onSnapshot(s => { S.hist = s.docs.map(d => ({ id: d.id, ...d.data() })); scheduleRender(); }, fail);
     db.doc("config/general").onSnapshot(s => { S.cfg = { ...DEFAULT_CFG, ...(s.exists ? s.data() : {}) }; scheduleRender(); }, fail);
+  } else if (nube.url) {
+    await nube.start(); return;
   } else {
     S.mode = "local"; lsLoad();
     let seeded = false; try { seeded = !!localStorage.getItem("chialli-seeded"); } catch {}
@@ -385,12 +477,14 @@ const TABS = [["productos", "Productos"], ["lista", "Lista de precios"], ["ingre
 function render() {
   const ni = Object.keys(S.ing).length, nr = Object.keys(S.rec).length;
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-act="tab" data-k="${k}" aria-selected="${ui.tab === k}">${l}${k === "productos" && nr ? `<span class="cnt">${nr}</span>` : ""}${k === "ingredientes" && ni ? `<span class="cnt">${ni}</span>` : ""}${k === "ingredientes" && lowStock().length ? `<span class="dot" title="Stock bajo"></span>` : ""}${k === "pedidos" && lowStock().length ? `<span class="cnt">${lowStock().length}</span>` : ""}</button>`).join("");
-  $("#store-chip").textContent = S.mode === "db" ? "Guardado en la nube" : S.mode === "local" ? "Guardado en este navegador" : S.mode === "readonly" ? "Solo lectura" : "Conectando…";
+  $("#store-chip").textContent = S.mode === "nube" ? (nube.err ? "Sin conexión, reintentando" : "Guardado en la nube") : S.mode === "login" ? "Nube" : S.mode === "db" ? "Guardado en la nube" : S.mode === "local" ? "Guardado en este navegador" : S.mode === "readonly" ? "Solo lectura" : "Conectando…";
   const v = $("#view");
   if (S.mode === "init") { v.innerHTML = `<div class="panel empty"><p>Cargando tus recetas…</p></div>`; return; }
+  if (S.mode === "login") { $("#tabs").innerHTML = ""; v.innerHTML = viewLogin(); return; }
   v.innerHTML = ({ productos: viewProductos, ingredientes: viewIngredientes, proveedores: viewProveedores, pedidos: viewPedidos, lista: viewLista, importar: viewImportar, historial: viewHistorial, ajustes: viewAjustes }[ui.tab] || viewProductos)();
   if (ui.tab === "ingredientes") renderIngRows();
   if (ui.tab === "productos") renderRecRows();
+  if (ui.tab === "ajustes" && S.mode === "nube" && nube.dueno) viewUsuarios();
   if (ui.tab === "ajustes") updGastosCalc();
 }
 
@@ -1027,9 +1121,14 @@ function viewAjustes() {
     <div class="calc" id="gastos-calc"></div>
     <div class="row"><span class="spacer"></span><button class="btn pri" data-act="save-cfg">Guardar ajustes</button></div>
   </div>
+  ${S.mode === "nube" ? `<div class="panel" style="padding:18px;display:flex;flex-direction:column;gap:10px">
+    <h3>Tu cuenta</h3>
+    <div class="row"><span>Entraste como <b>${esc(nube.email || "")}</b></span><span class="spacer"></span><button class="btn" data-act="salir">Cerrar sesión</button></div>
+    ${nube.dueno ? `<h4 style="margin:6px 0 0">Personas con acceso</h4><div id="usuarios-slot" style="display:flex;flex-direction:column;gap:10px"><p class="note">Cargando…</p></div>` : ""}
+  </div>` : ""}
   <div class="panel" style="padding:18px;display:flex;flex-direction:column;gap:10px">
     <h3>Copia de seguridad</h3>
-    <p class="note" style="margin:0">${S.mode === "db" ? "Tus datos se guardan en la nube y los ves desde cualquier dispositivo con tu cuenta." : "Tus datos se guardan en este navegador. Copiá el respaldo de vez en cuando y guardalo en un documento."} Para pasar datos de un lado a otro, copiá el respaldo y pegalo en el otro panel.</p>
+    <p class="note" style="margin:0">${S.mode === "db" || S.mode === "nube" ? "Tus datos se guardan en la nube y los ves desde cualquier dispositivo con tu cuenta." : "Tus datos se guardan en este navegador. Copiá el respaldo de vez en cuando y guardalo en un documento."} Para pasar datos de un lado a otro, copiá el respaldo y pegalo en el otro panel.</p>
     <div class="row"><button class="btn" data-act="backup">Mostrar respaldo para copiar</button><button class="btn" data-act="restore">Restaurar desde un respaldo</button>${hasEj ? `<span class="spacer"></span><span id="ej-zone"><button class="btn danger" data-act="ask-del-ej">Borrar datos de ejemplo</button></span>` : ""}</div>
     <div id="backup-slot"></div>
   </div>`;
@@ -1107,6 +1206,13 @@ document.addEventListener("click", async e => {
       toast(`Listo: sumé al stock ${items.length} producto${items.length === 1 ? "" : "s"}${g.prov ? " de " + g.prov : ""}.`); render(); break;
     }
     case "pedido-mas": ui.pedidoAbierto = ui.pedidoAbierto === t.dataset.prov ? null : t.dataset.prov; render(); break;
+    case "salir": await nube.flush(); nube.salir(); break;
+    case "usr-add": case "usr-del": {
+      t.disabled = true;
+      try { await nube.api("/usuarios", a === "usr-add" ? { email: $("#usr-email").value, clave: $("#usr-clave").value } : { email: t.dataset.email, borrar: true }); toast(a === "usr-add" ? "Listo, ya puede entrar con ese email y contraseña." : "Le quité el acceso."); viewUsuarios(); }
+      catch (err) { toast(err.message); t.disabled = false; }
+      break;
+    }
     case "lista-wa": { try { await navigator.clipboard.writeText(listaTexto()); toast("Lista copiada. Pegala en WhatsApp."); } catch { toast("No se pudo copiar desde acá."); } break; }
     case "lista-descargar": await descargarLista(); break;
     case "ver-bajo": ui.catIng = "__bajo"; ui.sel.clear(); setTab("ingredientes"); break;
