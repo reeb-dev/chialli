@@ -164,6 +164,28 @@ tr.sel td{background:color-mix(in srgb,var(--bordo) 8%,transparent)}
 .opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;background:var(--surface)}
 .opt.on{border-color:var(--bordo);background:color-mix(in srgb,var(--bordo) 7%,var(--surface))}
 .opt input{margin-top:4px;accent-color:var(--bordo)}
+tr.dim td{opacity:.55}
+a.btn{text-decoration:none}
+.msg{white-space:pre-wrap;background:var(--cream);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:.92rem;margin:6px 0 0}
+.lista-cols{grid-template-columns:300px 1fr}
+@media (max-width:760px){.lista-cols{grid-template-columns:1fr}}
+#hoja-slot{min-width:0}
+.hoja{background:#FFFDF8;color:#2C1A1D;border:1px solid #E8DAC5;border-radius:12px;padding:28px 30px;max-width:640px;font-family:"Alegreya Sans",system-ui,sans-serif;box-shadow:0 6px 24px rgba(60,20,25,.08)}
+.hoja-h{display:flex;gap:18px;align-items:center;border-bottom:2px solid #A3263A;padding-bottom:14px;margin-bottom:10px}
+.hoja .seal.small{background:#8E1E30;color:#FBF1E3;padding:4px 18px 6px;border-radius:40px/50%;display:inline-flex;flex-direction:column;align-items:center;line-height:1;outline:none;border:0}
+.hoja .seal.small b{font-family:"Dancing Script",cursive;font-size:1.9rem}
+.hoja .seal.small small{font-family:"Zilla Slab",serif;font-size:.58rem;letter-spacing:.2em;text-transform:uppercase}
+.hoja-t{font-family:"Zilla Slab",serif;font-size:1.5rem;font-weight:600;color:#7B1828}
+.hoja-d{color:#76605D;font-size:.95rem}
+.hoja-cat{margin-top:14px;break-inside:avoid}
+.hoja-cat h4{font-family:"Zilla Slab",serif;font-size:1.05rem;color:#A3263A;margin:0 0 4px;text-transform:uppercase;letter-spacing:.08em}
+.hoja-row{display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:1.02rem}
+.hoja-row i{color:#76605D;font-size:.85rem}
+.hoja-row b{font-variant-numeric:tabular-nums}
+.lead-dots{flex:1;border-bottom:1.5px dotted #CDB9A0;transform:translateY(-4px)}
+.hoja-nota{margin:16px 0 0;font-style:italic;color:#5a4645}
+.hoja-f{margin-top:18px;padding-top:10px;border-top:1px solid #E8DAC5;font-size:.8rem;color:#76605D;text-align:center}
+@media print{body *{visibility:hidden}#hoja-slot,#hoja-slot *{visibility:visible}#hoja-slot{position:absolute;left:0;top:0;width:100%}.hoja{box-shadow:none;border:0;max-width:none}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:calc(100% - 32px)}
 .hist-day{font-family:var(--f-head);font-weight:600;padding:10px 12px;background:var(--cream)}
 @media (prefers-reduced-motion:no-preference){.toast{animation:pop .2s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
@@ -324,7 +346,7 @@ function tandasPosibles(r) {
 function stockAlert() {
   const low = lowStock(); if (!low.length) return "";
   const porProv = {}; low.forEach(([, i]) => { const k = i.proveedor || "Sin proveedor"; (porProv[k] ||= []).push(i.nombre); });
-  return `<div class="alert" role="alert"><div class="row" style="gap:8px"><b>Te estás quedando sin stock de ${low.length} ingrediente${low.length > 1 ? "s" : ""}</b><span class="spacer"></span><button class="btn sm" data-act="ver-bajo">Ver stock bajo</button></div>
+  return `<div class="alert" role="alert"><div class="row" style="gap:8px"><b>Te estás quedando sin stock de ${low.length} ingrediente${low.length > 1 ? "s" : ""}</b><span class="spacer"></span><button class="btn sm" data-act="ver-bajo">Ver stock bajo</button><button class="btn sm pri" data-act="tab" data-k="pedidos">Armar pedidos</button></div>
     <div class="alert-list">${low.map(([, i]) => `<span class="pill ${stockState(i) === "agotado" ? "bad" : "warn"}">${esc(i.nombre)}: ${stockState(i) === "agotado" ? "agotado" : `quedan ${fmtNum(parseNum(i.stock))} ${SHORT[i.unidad] || ""}`}</span>`).join("")}</div>
     <div class="sub">Pedir a: ${Object.entries(porProv).map(([p, l]) => `<b>${esc(p)}</b> (${esc(l.join(", "))})`).join(" · ")}</div></div>`;
 }
@@ -359,14 +381,14 @@ const recipesUsing = ids => Object.entries(S.rec).filter(([, r]) => (r.items || 
 const sortByName = (a, b) => (a[1].nombre || "").localeCompare(b[1].nombre || "", "es");
 
 /* ====================== Render ====================== */
-const TABS = [["productos", "Productos"], ["ingredientes", "Ingredientes"], ["proveedores", "Proveedores"], ["importar", "Importar Word"], ["historial", "Historial"], ["ajustes", "Ajustes"]];
+const TABS = [["productos", "Productos"], ["lista", "Lista de precios"], ["ingredientes", "Ingredientes"], ["pedidos", "Pedidos"], ["proveedores", "Proveedores"], ["importar", "Importar Word"], ["historial", "Historial"], ["ajustes", "Ajustes"]];
 function render() {
   const ni = Object.keys(S.ing).length, nr = Object.keys(S.rec).length;
-  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-act="tab" data-k="${k}" aria-selected="${ui.tab === k}">${l}${k === "productos" && nr ? `<span class="cnt">${nr}</span>` : ""}${k === "ingredientes" && ni ? `<span class="cnt">${ni}</span>` : ""}${k === "ingredientes" && lowStock().length ? `<span class="dot" title="Stock bajo"></span>` : ""}</button>`).join("");
+  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-act="tab" data-k="${k}" aria-selected="${ui.tab === k}">${l}${k === "productos" && nr ? `<span class="cnt">${nr}</span>` : ""}${k === "ingredientes" && ni ? `<span class="cnt">${ni}</span>` : ""}${k === "ingredientes" && lowStock().length ? `<span class="dot" title="Stock bajo"></span>` : ""}${k === "pedidos" && lowStock().length ? `<span class="cnt">${lowStock().length}</span>` : ""}</button>`).join("");
   $("#store-chip").textContent = S.mode === "db" ? "Guardado en la nube" : S.mode === "local" ? "Guardado en este navegador" : S.mode === "readonly" ? "Solo lectura" : "Conectando…";
   const v = $("#view");
   if (S.mode === "init") { v.innerHTML = `<div class="panel empty"><p>Cargando tus recetas…</p></div>`; return; }
-  v.innerHTML = ({ productos: viewProductos, ingredientes: viewIngredientes, proveedores: viewProveedores, importar: viewImportar, historial: viewHistorial, ajustes: viewAjustes }[ui.tab] || viewProductos)();
+  v.innerHTML = ({ productos: viewProductos, ingredientes: viewIngredientes, proveedores: viewProveedores, pedidos: viewPedidos, lista: viewLista, importar: viewImportar, historial: viewHistorial, ajustes: viewAjustes }[ui.tab] || viewProductos)();
   if (ui.tab === "ingredientes") renderIngRows();
   if (ui.tab === "productos") renderRecRows();
   if (ui.tab === "ajustes") updGastosCalc();
@@ -687,6 +709,116 @@ function openProv(id, rubro) {
   $("#p-nombre").focus();
 }
 
+/* ---------- Pedidos a proveedores ---------- */
+ui.pedido = {};
+function sugerido(i) {
+  // Paquetes a pedir para volver al doble del mínimo
+  const st = parseNum(i.stock) || 0, mn = parseNum(i.stockMinimo) || 0, paq = parseNum(i.cantidad) || 1;
+  if (!["bajo", "agotado"].includes(stockState(i))) return 0;
+  return Math.max(1, Math.ceil((Math.max(mn * 2, mn + paq) - st) / paq));
+}
+const paquetes = id => ui.pedido[id] ?? sugerido(S.ing[id]);
+const presentacion = i => `${fmtNum(parseNum(i.cantidad))} ${plural(UNITS[i.unidad]?.label || i.unidad, parseNum(i.cantidad))}`;
+function pedidosPorProveedor() {
+  const g = {};
+  Object.entries(S.ing).sort(sortByName).forEach(([id, i]) => { const k = i.proveedor || ""; (g[k] ||= []).push([id, i]); });
+  return Object.entries(g).map(([prov, items]) => ({ prov, p: Object.entries(S.prov).find(([, x]) => norm(x.nombre) === norm(prov)), items: items.sort((a, b) => (sugerido(b[1]) > 0) - (sugerido(a[1]) > 0) || a[1].nombre.localeCompare(b[1].nombre, "es")) }))
+    .filter(x => x.items.some(([id]) => paquetes(id) > 0) || ui.pedidoAbierto === x.prov)
+    .sort((a, b) => (a.prov ? 0 : 1) - (b.prov ? 0 : 1) || a.prov.localeCompare(b.prov, "es"));
+}
+function textoPedido(prov, p, items) {
+  const lines = items.filter(([id]) => paquetes(id) > 0).map(([id, i]) => `• ${paquetes(id)} × ${i.nombre} (${presentacion(i)})`);
+  const quien = p?.[1]?.contacto || "";
+  return `Hola${quien ? " " + quien : ""}! Te paso el pedido para Chialli:\n\n${lines.join("\n")}\n\n¿Me confirmás precio y cuándo lo podés entregar? Gracias!`;
+}
+function waLink(tel, text) {
+  let d = String(tel || "").replace(/\D/g, "");
+  if (d && !d.startsWith("54")) d = "549" + d.replace(/^0/, "");
+  return `https://wa.me/${d}?text=${encodeURIComponent(text)}`;
+}
+function viewPedidos() {
+  const grupos = pedidosPorProveedor();
+  const head = `<div><h2>Pedidos a proveedores</h2><p class="lead">Con lo que se está terminando, el panel arma un pedido para cada proveedor. Ajustá las cantidades, mandalo por WhatsApp y, cuando llegue, tocá «Recibí el pedido» para sumarlo al stock.</p></div>`;
+  if (!grupos.length) return head + `<div class="panel empty"><p>No hay nada para pedir: ningún ingrediente está por debajo del mínimo. Cargá el stock y el mínimo de cada ingrediente para que el panel te avise.</p><button class="btn" data-act="tab" data-k="ingredientes">Ir a Ingredientes</button></div>`;
+  return head + grupos.map(({ prov, p, items }) => {
+    const k = esc(prov); const total = items.reduce((a, [id, i]) => a + paquetes(id) * (parseNum(i.precio) || 0), 0);
+    const n = items.filter(([id]) => paquetes(id) > 0).length; const tel = p?.[1]?.telefono;
+    return `<div class="panel rubro">
+      <div class="row"><h3>${prov ? k : "Sin proveedor asignado"}</h3>${p?.[1]?.telefono ? `<span class="sub">${esc(p[1].telefono)}</span>` : ""}${p?.[1]?.notas ? `<span class="sub">· ${esc(p[1].notas)}</span>` : ""}<span class="spacer"></span><span class="sub">${n} producto${n === 1 ? "" : "s"} · aprox. <b>${fmtMoney(total)}</b></span></div>
+      <div class="tbl-wrap items"><table style="min-width:520px"><thead><tr><th>Ingrediente</th><th class="r">Stock</th><th class="r">Paquetes a pedir</th><th class="r">Subtotal</th></tr></thead><tbody>
+      ${items.filter(([id]) => paquetes(id) > 0 || ui.pedidoAbierto === prov).map(([id, i]) => { const st = stockState(i); return `<tr class="${paquetes(id) > 0 ? "" : "dim"}"><td><div class="name">${esc(i.nombre)}</div><div class="sub">Paquete de ${presentacion(i)}</div></td>
+        <td class="r num">${hasStock(i) ? `${fmtNum(parseNum(i.stock), 3)} ${SHORT[i.unidad] || ""}` : "—"}${st === "agotado" ? ` <span class="pill bad">Agotado</span>` : st === "bajo" ? ` <span class="pill warn">Bajo</span>` : ""}</td>
+        <td class="r"><input class="in num" style="width:80px;text-align:right" data-pedido="${id}" inputmode="numeric" value="${paquetes(id) || ""}" placeholder="0" aria-label="Paquetes de ${esc(i.nombre)}"></td>
+        <td class="r num">${paquetes(id) > 0 ? fmtMoney(paquetes(id) * (parseNum(i.precio) || 0)) : "—"}</td></tr>`; }).join("")}
+      </tbody></table></div>
+      ${items.some(([id]) => !(paquetes(id) > 0)) ? `<button class="btn sm" style="align-self:flex-start" data-act="pedido-mas" data-prov="${k}">${ui.pedidoAbierto === prov ? "Mostrar solo lo que falta" : "Agregar otros productos de este proveedor"}</button>` : ""}
+      ${n ? `<details><summary class="note">Ver el mensaje</summary><pre class="msg">${esc(textoPedido(prov, p, items))}</pre></details>` : ""}
+      <div class="row">${n ? `<a class="btn pri" href="${esc(waLink(tel, textoPedido(prov, p, items)))}" target="_blank" rel="noopener">Enviar por WhatsApp</a><button class="btn" data-act="copiar-pedido" data-prov="${k}">Copiar mensaje</button>` : ""}<span class="spacer"></span>${n ? `<button class="btn" data-act="recibir" data-prov="${k}">Recibí el pedido</button>` : ""}</div>
+      ${!tel && prov && n ? `<p class="note" style="margin:0">Este proveedor no tiene teléfono cargado: WhatsApp te va a pedir que elijas el contacto. Podés cargarlo en Proveedores.</p>` : ""}
+    </div>`; }).join("");
+}
+
+/* ---------- Lista de precios ---------- */
+ui.lista = { fuera: new Set(), nota: "", iva: true };
+const singular = u => { u = String(u || "unidad").trim(); return /^unidades$/i.test(u) ? "unidad" : /^porciones$/i.test(u) ? "porción" : /^docenas$/i.test(u) ? "docena" : u.replace(/s$/, ""); };
+function listaData() {
+  const g = {};
+  Object.values(S.rec).forEach(r => { const c = recCalc(r); if (!(c.precio > 0)) return; const cat = r.categoria || "Otros"; (g[cat] ||= []).push({ nombre: r.nombre, unidad: singular(r.unidadRinde), precio: c.precio }); });
+  return Object.entries(g).sort((a, b) => a[0].localeCompare(b[0], "es")).map(([cat, items]) => [cat, items.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))]);
+}
+function hojaHTML() {
+  const data = listaData().filter(([c]) => !ui.lista.fuera.has(c));
+  const hoy = new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+  return `<div class="hoja"><div class="hoja-h"><div class="seal small"><b>Chialli</b><small>Libre de gluten</small></div><div><div class="hoja-t">Lista de precios</div><div class="hoja-d">${esc(hoy)}</div></div></div>
+    ${data.map(([cat, items]) => `<div class="hoja-cat"><h4>${esc(cat)}</h4>${items.map(it => `<div class="hoja-row"><span>${esc(it.nombre)} <i>x ${esc(it.unidad)}</i></span><span class="lead-dots"></span><b>${fmtMoney(it.precio)}</b></div>`).join("")}</div>`).join("")}
+    ${ui.lista.nota ? `<p class="hoja-nota">${esc(ui.lista.nota)}</p>` : ""}
+    <div class="hoja-f">${S.cfg.iva > 0 && ui.lista.iva ? "Precios finales con IVA incluido · " : ""}Productos sin TACC · Av. San Martín 730, Sierra de la Ventana · @marianellalibredegluten</div></div>`;
+}
+function listaTexto() {
+  const data = listaData().filter(([c]) => !ui.lista.fuera.has(c));
+  const hoy = new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long" });
+  return `*Chialli · Libre de gluten* 🌾\nLista de precios al ${hoy}\n\n` + data.map(([cat, items]) => `*${cat}*\n` + items.map(it => `• ${it.nombre} (x ${it.unidad}): ${fmtMoney(it.precio)}`).join("\n")).join("\n\n") + (ui.lista.nota ? `\n\n${ui.lista.nota}` : "") + `\n\nPedidos por acá o en Instagram @marianellalibredegluten`;
+}
+function viewLista() {
+  const cats = listaData().map(([c]) => c);
+  if (!cats.length) return `<div><h2>Lista de precios</h2></div><div class="panel empty"><p>Cuando tengas recetas con precio, acá se arma la lista para imprimir o mandar.</p></div>`;
+  return `<div><h2>Lista de precios</h2><p class="lead">Se arma sola con los precios actuales. Elegí qué categorías incluir y compartila.</p></div>
+  <div class="cols lista-cols">
+    <div class="panel" style="padding:16px;display:flex;flex-direction:column;gap:12px;align-self:start">
+      <div class="note">Categorías</div>
+      <div class="row">${cats.map(c => `<label class="chip"><input type="checkbox" data-lcat="${esc(c)}" ${ui.lista.fuera.has(c) ? "" : "checked"}> ${esc(c)}</label>`).join("")}</div>
+      <label class="f">Nota al pie (opcional)<input class="in" id="l-nota" value="${esc(ui.lista.nota)}" placeholder="ej. Encargos con 48 h de anticipación"></label>
+      <div class="row" style="flex-direction:column;align-items:stretch">
+        <button class="btn pri" data-act="lista-wa">Copiar para WhatsApp</button>
+        <button class="btn" data-act="lista-descargar">${window.claude?.use ? "Descargar para imprimir" : "Imprimir o guardar PDF"}</button>
+      </div>
+      <p class="note" style="margin:0">${window.claude?.use ? "Se descarga una página lista para imprimir o guardar como PDF." : "En la ventana de impresión elegí «Guardar como PDF» si querés mandarla."}</p>
+    </div>
+    <div id="hoja-slot">${hojaHTML()}</div>
+  </div>`;
+}
+const HOJA_CSS = `.hoja{background:#FFFDF8;color:#2C1A1D;border:1px solid #E8DAC5;border-radius:12px;padding:28px 30px;max-width:640px;font-family:"Alegreya Sans",system-ui,sans-serif;box-shadow:0 6px 24px rgba(60,20,25,.08)}
+.hoja-h{display:flex;gap:18px;align-items:center;border-bottom:2px solid #A3263A;padding-bottom:14px;margin-bottom:10px}
+.hoja .seal.small{background:#8E1E30;color:#FBF1E3;padding:4px 18px 6px;border-radius:40px/50%;display:inline-flex;flex-direction:column;align-items:center;line-height:1;outline:none;border:0}
+.hoja .seal.small b{font-family:"Dancing Script",cursive;font-size:1.9rem}
+.hoja .seal.small small{font-family:"Zilla Slab",serif;font-size:.58rem;letter-spacing:.2em;text-transform:uppercase}
+.hoja-t{font-family:"Zilla Slab",serif;font-size:1.5rem;font-weight:600;color:#7B1828}
+.hoja-d{color:#76605D;font-size:.95rem}
+.hoja-cat{margin-top:14px;break-inside:avoid}
+.hoja-cat h4{font-family:"Zilla Slab",serif;font-size:1.05rem;color:#A3263A;margin:0 0 4px;text-transform:uppercase;letter-spacing:.08em}
+.hoja-row{display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:1.02rem}
+.hoja-row i{color:#76605D;font-size:.85rem}
+.hoja-row b{font-variant-numeric:tabular-nums}
+.lead-dots{flex:1;border-bottom:1.5px dotted #CDB9A0;transform:translateY(-4px)}
+.hoja-nota{margin:16px 0 0;font-style:italic;color:#5a4645}
+.hoja-f{margin-top:18px;padding-top:10px;border-top:1px solid #E8DAC5;font-size:.8rem;color:#76605D;text-align:center}`;
+async function descargarLista() {
+  const doc = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Lista de precios Chialli</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Zilla+Slab:wght@600&family=Alegreya+Sans:wght@400;700&display=swap"><style>body{margin:0;padding:24px;background:#fff;display:flex;justify-content:center}${HOJA_CSS}.hoja{box-shadow:none;border:0}@media print{body{padding:0}}</style></head><body>${hojaHTML()}<script>setTimeout(()=>print(),600)<\/script></body></html>`;
+  const dl = window.claude?.use ? await window.claude.use("downloads").catch(() => null) : null;
+  if (dl) { try { await dl.save({ filename: "lista-de-precios-chialli.html", data: doc }); toast("Abrí el archivo descargado: se abre listo para imprimir o guardar como PDF."); } catch (e) { if (e?.code !== "declined") toast("No se pudo descargar acá. Probá desde la versión de GitHub."); } return; }
+  window.print();
+}
+
 /* ---------- Importar desde Word ---------- */
 function viewImportar() {
   return `<div><h2>Importar recetas desde Word</h2><p class="lead">Subí un archivo .docx con una o varias recetas. Cada receta necesita un título y debajo los ingredientes con su cantidad, por ejemplo «250 g harina de arroz» o «3 huevos». Después revisás todo antes de guardar.</p></div>
@@ -967,6 +1099,16 @@ document.addEventListener("click", async e => {
     case "edit-ing": openIng(id); break;
     case "new-prov": openProv(null, t.dataset.rubro); break;
     case "usar-sugerido": $("#r-fijo").value = ""; updRecCalc(); break;
+    case "copiar-pedido": case "recibir": {
+      const g = pedidosPorProveedor().find(x => x.prov === t.dataset.prov); if (!g) break;
+      if (a === "copiar-pedido") { const txt = textoPedido(g.prov, g.p, g.items); try { await navigator.clipboard.writeText(txt); toast("Pedido copiado. Pegalo en WhatsApp."); } catch { toast("No se pudo copiar: abrí «Ver el mensaje» y copialo a mano."); } break; }
+      const items = g.items.filter(([iid]) => paquetes(iid) > 0); t.disabled = true;
+      for (const [iid, i] of items) { const st = hasStock(i) ? parseNum(i.stock) : 0; await put("ingredientes", iid, { ...i, stock: Math.round((st + paquetes(iid) * (parseNum(i.cantidad) || 1)) * 1000) / 1000 }); delete ui.pedido[iid]; }
+      toast(`Listo: sumé al stock ${items.length} producto${items.length === 1 ? "" : "s"}${g.prov ? " de " + g.prov : ""}.`); render(); break;
+    }
+    case "pedido-mas": ui.pedidoAbierto = ui.pedidoAbierto === t.dataset.prov ? null : t.dataset.prov; render(); break;
+    case "lista-wa": { try { await navigator.clipboard.writeText(listaTexto()); toast("Lista copiada. Pegala en WhatsApp."); } catch { toast("No se pudo copiar desde acá."); } break; }
+    case "lista-descargar": await descargarLista(); break;
     case "ver-bajo": ui.catIng = "__bajo"; ui.sel.clear(); setTab("ingredientes"); break;
     case "producir": {
       const r = S.rec[recDraft.id]; const n = parseNum($("#r-tandas").value) || 0; if (!(n > 0)) { $("#r-tandas").focus(); break; }
@@ -1030,6 +1172,7 @@ document.addEventListener("input", e => {
   else if (t.id === "q-ing") { ui.qIng = t.value; renderIngRows(); }
   else if (t.id === "q-prov") { ui.qProv = t.value; const pos = t.selectionStart; render(); const n = $("#q-prov"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
   else if (t.id === "bulk-val") ui.bulkVal = t.value;
+  else if (t.id === "l-nota") { ui.lista.nota = t.value; $("#hoja-slot").innerHTML = hojaHTML(); }
   else if (t.dataset.item != null) { const it = recDraft.items[+t.dataset.item]; it[t.dataset.f] = t.dataset.f === "cantidad" ? t.value : t.value; updRecCalc(); }
   else if (t.dataset.extra != null) { recDraft.extras[+t.dataset.extra][t.dataset.f] = t.value; updRecCalc(); }
   else if (t.closest("#rec-form")) updRecCalc();
@@ -1044,6 +1187,8 @@ document.addEventListener("change", e => {
   else if (t.id === "cat-ing") { ui.catIng = t.value; ui.sel.clear(); renderIngRows(); }
   else if (t.id === "sel-all") { visibleIngs().forEach(([id]) => t.checked ? ui.sel.add(id) : ui.sel.delete(id)); renderIngRows(); }
   else if (t.id === "docx") handleDocx(t.files[0]);
+  else if (t.dataset.pedido) { const v = parseNum(t.value); ui.pedido[t.dataset.pedido] = t.value.trim() === "" || !isFinite(v) ? 0 : Math.max(0, Math.round(v)); render(); }
+  else if (t.dataset.lcat != null) { if (t.checked) ui.lista.fuera.delete(t.dataset.lcat); else ui.lista.fuera.add(t.dataset.lcat); $("#hoja-slot").innerHTML = hojaHTML(); }
   else if (t.name === "pmode" && ui.preview) { ui.preview.mode = t.value; openPreview(ui.preview.newPrices, ui.preview.title); }
   else if (t.id === "r-gastos") updRecCalc();
   else if (t.dataset.item != null && t.tagName === "SELECT") { const it = recDraft.items[+t.dataset.item]; it[t.dataset.f] = t.value; if (t.dataset.f === "ingId" && S.ing[t.value]) { const dim = UNITS[S.ing[t.value].unidad].dim; if (UNITS[it.unidad].dim !== dim) it.unidad = dim === "u" ? "u" : "g"; } readRecHead(); renderItems(); updRecCalc(); }
@@ -1101,4 +1246,5 @@ document.addEventListener("drop", e => { const d = e.target.closest?.("#drop"); 
 render();
 initStore();
 </script>
+
 </body></html>
